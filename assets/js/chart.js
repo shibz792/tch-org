@@ -65,6 +65,41 @@
     });
     return label;
   };
+  const fitTspan = (tspan, value, maxWidth) => {
+    const requiresEllipsis = text(value).endsWith('…');
+    let output = text(value).replace(/…+$/, '');
+    tspan.text(`${output}${requiresEllipsis ? '…' : ''}`);
+    while (output.length > 1 && tspan.node().getComputedTextLength() > maxWidth) {
+      output = output.slice(0, -1).trimEnd();
+      tspan.text(`${output}…`);
+    }
+  };
+  const fittedText = (selection, value, x, y, maxWidth, maxLines, className, lineHeight = 16, anchor = 'start') => {
+    const label = selection.append('text').attr('class', className).attr('x', x).attr('y', y).attr('text-anchor', anchor);
+    const words = text(value).trim().split(/\s+/).filter(Boolean);
+    const lines = [];
+    let current = [];
+    for (const word of words) {
+      const test = label.append('tspan').attr('x', x).text([...current, word].join(' '));
+      const fits = test.node().getComputedTextLength() <= maxWidth;
+      test.remove();
+      if (!fits && current.length) {
+        lines.push(current.join(' '));
+        current = [word];
+      } else {
+        current.push(word);
+      }
+    }
+    if (current.length) lines.push(current.join(' '));
+    const visible = lines.slice(0, maxLines);
+    visible.forEach((line, index) => {
+      const tspan = label.append('tspan').attr('x', x).attr('dy', index === 0 ? 0 : lineHeight);
+      fitTspan(tspan, index === maxLines - 1 && lines.length > maxLines ? `${line}…` : line, maxWidth);
+    });
+    return { label, lineCount: Math.max(1, visible.length) };
+  };
+  const fittedSingle = (selection, value, x, y, maxWidth, className, anchor = 'start') =>
+    fittedText(selection, value, x, y, maxWidth, 1, className, 16, anchor).label;
   const nameClass = value => {
     const length = text(value).trim().length;
     if (length > 23) return 'node-name node-name-long';
@@ -131,22 +166,20 @@
     }
 
     if (focused) {
-      const nameLines = textLines(person.name, 30, 2);
-      const titleY = 187 + ((nameLines.length - 1) * 22) + 25;
-      multiline(visual, person.name, size.width / 2, 187, 30, 2, nameClass(person.name), 22).attr('text-anchor', 'middle').selectAll('tspan').attr('x', size.width / 2);
-      multiline(visual, person.title || 'Role not listed', size.width / 2, titleY, 44, 2, 'node-role', 17).attr('text-anchor', 'middle').selectAll('tspan').attr('x', size.width / 2);
-      visual.append('text').attr('class', 'node-dept').attr('x', size.width / 2).attr('y', 147).attr('text-anchor', 'middle').text(person.department || 'Organization');
+      const nameBlock = fittedText(visual, person.name, size.width / 2, 187, size.width - 60, 2, nameClass(person.name), 22, 'middle');
+      const titleY = 187 + ((nameBlock.lineCount - 1) * 22) + 25;
+      fittedText(visual, person.title || 'Role not listed', size.width / 2, titleY, size.width - 70, 2, 'node-role', 17, 'middle');
+      fittedSingle(visual, person.department || 'Organization', size.width / 2, 147, size.width - 90, 'node-dept', 'middle');
       const manager = d.parent?.data?.id ? d.parent.data.name : 'Top level';
-      visual.append('text').attr('class', 'node-responsibility').attr('x', 30).attr('y', size.height - 18).text(`Reports to ${manager}`);
-      visual.append('text').attr('class', 'profile-hint').attr('x', size.width - 30).attr('y', size.height - 18).attr('text-anchor', 'end').text('Click again to view profile');
+      fittedSingle(visual, `Reports to ${manager}`, 30, size.height - 18, 160, 'node-responsibility');
+      fittedSingle(visual, 'Click again to view profile', size.width - 30, size.height - 18, 155, 'profile-hint', 'end');
     } else {
-      const nameLines = textLines(person.name, 21, 2);
-      const titleY = 111 + ((nameLines.length - 1) * 21) + 26;
-      multiline(visual, person.name, 132, 111, 21, 2, nameClass(person.name), 21);
-      multiline(visual, person.title || 'Role not listed', 132, titleY, 29, 2, 'node-role', 17);
-      visual.append('text').attr('class', 'node-dept').attr('x', 132).attr('y', 72).text(person.department || 'Organization');
-      visual.append('text').attr('class', 'node-responsibility').attr('x', 132).attr('y', size.height - 17)
-        .text(`${person.direct_reports || 0} direct report${Number(person.direct_reports) === 1 ? '' : 's'}`);
+      const contentWidth = size.width - 154;
+      const nameBlock = fittedText(visual, person.name, 132, 111, contentWidth, 2, nameClass(person.name), 21);
+      const titleY = 111 + ((nameBlock.lineCount - 1) * 21) + 25;
+      fittedText(visual, person.title || 'Role not listed', 132, titleY, contentWidth, 2, 'node-role', 17);
+      fittedSingle(visual, person.department || 'Organization', 132, 72, contentWidth, 'node-dept');
+      fittedSingle(visual, `${person.direct_reports || 0} direct report${Number(person.direct_reports) === 1 ? '' : 's'}`, 132, size.height - 17, contentWidth - 30, 'node-responsibility');
     }
     if (person.is_cherry_global) {
       const badge = visual.append('g').attr('class', 'cherry-badge').attr('transform', `translate(${size.width - 91},${surfaceY + 15})`);
