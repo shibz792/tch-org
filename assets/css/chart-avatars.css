@@ -5,10 +5,11 @@
 .node-card:hover .portrait-halo,.node-card:focus .portrait-halo{stroke-width:6;filter:drop-shadow(0 0 15px rgba(67,185,149,.9))}
 .node-card.cherry-global .portrait-halo{stroke:#df3151;filter:drop-shadow(0 0 10px rgba(210,4,45,.55))}
 .node-initials{fill:#e8fff7;font-size:21px;font-weight:850;letter-spacing:.04em}
-.node-card .cherry-badge rect,.node-card:hover .cherry-badge rect,.node-card:focus .cherry-badge rect{fill:#b81032;stroke:#ee5571;stroke-width:.8;filter:none}
-.cherry-badge text{fill:#fff;font-size:7px;font-weight:900;letter-spacing:.08em}
+.cherry-watermark{opacity:1;pointer-events:none;filter:saturate(.96) drop-shadow(0 2px 5px rgba(0,0,0,.2));transition:filter .28s ease,transform .28s ease;transform-box:fill-box;transform-origin:center}
+.node-card:hover .cherry-watermark,.node-card:focus .cherry-watermark{filter:saturate(1.08) drop-shadow(0 0 8px rgba(234,20,176,.42));transform:scale(1.06)}
 .profile-affiliation{display:inline-flex;margin:.1rem 0 .5rem;padding:.38rem .65rem;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
 .profile-affiliation.cherry-global{border-color:#df3151;background:rgba(210,4,45,.12);color:#ff9aae}
+.profile-affiliation.cherry-global{padding:.42rem .8rem;background:rgba(255,255,255,.04)}.profile-affiliation.cherry-global img{display:block;width:150px;height:auto;max-height:34px;object-fit:contain}
 .profile-team{margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--line)}
 .profile-team h3{font-size:1.15rem;margin:0 0 1rem}
 .profile-team-member{display:grid;grid-template-columns:auto 1fr auto;gap:.8rem;align-items:center;width:100%;padding:.8rem;border:1px solid rgba(126,216,190,.16);border-radius:16px;background:#0c202e;color:#effff9;text-align:left;cursor:pointer;margin-bottom:.65rem;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}

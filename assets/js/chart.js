@@ -151,6 +151,12 @@
       .attr('width', size.width).attr('height', surfaceHeight).attr('rx', focused ? 30 : 25);
     visual.append('rect').attr('class', 'node-glow').attr('x', 1).attr('y', surfaceY + 1)
       .attr('width', size.width - 2).attr('height', surfaceHeight - 2).attr('rx', focused ? 29 : 24);
+    if (person.is_cherry_global) {
+      visual.append('image').attr('class', 'cherry-watermark').attr('href', '/assets/cherry-global-mark.png')
+        .attr('x', focused ? 30 : 44).attr('y', focused ? surfaceY + 18 : portraitY + portraitRadius + 11)
+        .attr('width', focused ? 46 : 48).attr('height', focused ? 43 : 45)
+        .attr('preserveAspectRatio', 'xMidYMid meet');
+    }
     visual.append('rect').attr('class', 'node-accent').attr('x', focused ? 30 : 132).attr('y', focused ? 157 : 79)
       .attr('width', focused ? size.width - 60 : size.width - 158).attr('height', 3).attr('rx', 2).attr('fill', departmentColor);
     visual.append('circle').attr('class', 'portrait-halo').attr('cx', portraitX).attr('cy', portraitY).attr('r', portraitRadius + 5);
@@ -166,8 +172,9 @@
     }
 
     if (focused) {
-      const nameBlock = fittedText(visual, person.name, size.width / 2, 187, size.width - 60, 2, nameClass(person.name), 22, 'middle');
-      const titleY = 187 + ((nameBlock.lineCount - 1) * 22) + 25;
+      const nameY = 187;
+      const nameBlock = fittedText(visual, person.name, size.width / 2, nameY, size.width - 60, 2, nameClass(person.name), 22, 'middle');
+      const titleY = nameY + ((nameBlock.lineCount - 1) * 22) + 25;
       fittedText(visual, person.title || 'Role not listed', size.width / 2, titleY, size.width - 70, 2, 'node-role', 17, 'middle');
       fittedSingle(visual, person.department || 'Organization', size.width / 2, 147, size.width - 90, 'node-dept', 'middle');
       const manager = d.parent?.data?.id ? d.parent.data.name : 'Top level';
@@ -180,11 +187,6 @@
       fittedText(visual, person.title || 'Role not listed', 132, titleY, contentWidth, 2, 'node-role', 17);
       fittedSingle(visual, person.department || 'Organization', 132, 72, contentWidth, 'node-dept');
       fittedSingle(visual, `${person.direct_reports || 0} direct report${Number(person.direct_reports) === 1 ? '' : 's'}`, 132, size.height - 17, contentWidth - 30, 'node-responsibility');
-    }
-    if (person.is_cherry_global) {
-      const badge = visual.append('g').attr('class', 'cherry-badge').attr('transform', `translate(${size.width - 91},${surfaceY + 15})`);
-      badge.append('rect').attr('width', 76).attr('height', 22).attr('rx', 11);
-      badge.append('text').attr('x', 38).attr('y', 14).attr('text-anchor', 'middle').text('CHERRY GLOBAL');
     }
     if (person.children?.length) {
       const collapse = visual.append('g').attr('class', 'collapse-control')
@@ -328,7 +330,9 @@
     const dept = document.createElement('span'); dept.className = 'eyebrow'; dept.textContent = p.department || 'Organization';
     const name = document.createElement('h2'); name.textContent = p.name; const role = document.createElement('p'); role.className = 'profile-role'; role.textContent = p.title || 'Role not listed';
     const affiliation = document.createElement('div'); affiliation.className = p.is_cherry_global ? 'profile-affiliation cherry-global' : 'profile-affiliation';
-    affiliation.textContent = p.is_cherry_global ? 'Cherry Global Resource' : 'Tech Cargo Hub Resource';
+    if (p.is_cherry_global) {
+      const affiliationLogo = document.createElement('img'); affiliationLogo.src = '/assets/cherry-global-logo.png'; affiliationLogo.alt = 'Cherry Global resource'; affiliation.append(affiliationLogo);
+    } else affiliation.textContent = 'Tech Cargo Hub Resource';
     const grid = document.createElement('div'); grid.className = 'profile-grid';
     [['Manager',p.manager_name||'Top level'],['Warehouse',p.warehouse_code ? `${p.warehouse_code}${p.warehouse_name ? ` · ${p.warehouse_name}` : ''}` : 'Not assigned'],['Location',p.location||p.warehouse_location||'Not listed'],['Email',p.email||'Not listed'],['Phone',p.phone||'Not listed']].forEach(([label,value]) => { const box=document.createElement('div');box.className='profile-field';const s=document.createElement('small');s.textContent=label;const v=document.createElement('strong');v.textContent=value;box.append(s,v);grid.append(box); });
     const bio = document.createElement('p'); bio.className = 'profile-bio'; bio.textContent = p.bio || 'Profile details will be added soon.';
