@@ -1,23 +1,24 @@
 FROM php:8.3-apache
 
-# Install required extensions
+# Install required PHP extensions
 RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
     && docker-php-ext-install pdo pdo_sqlite \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Enable Apache rewrite module (needed for your .htaccess / router)
+# Enable Apache modules
 RUN a2enmod rewrite
 
-# Copy all files
+# Copy all project files
 COPY . /var/www/html/
 
-# Set permissions
+# Set correct permissions
 RUN chown -R www-data:www-data /var/www/html/storage \
-    && chown -R www-data:www-data /var/www/html/uploads
+    && chown -R www-data:www-data /var/www/html/uploads \
+    && chmod -R 755 /var/www/html/storage \
+    && chmod -R 755 /var/www/html/uploads
 
-# Apache config
-COPY .htaccess /var/www/html/
+# Apache configuration
 RUN echo '<Directory /var/www/html>\n\
     Options Indexes FollowSymLinks\n\
     AllowOverride All\n\
