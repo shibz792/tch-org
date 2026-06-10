@@ -1,24 +1,20 @@
-.node-avatar-halo{fill:#fffefb;stroke:url(#brandOutline);stroke-width:3.5;filter:drop-shadow(0 12px 20px rgba(10,42,37,.3))}
-.node-avatar-ring{stroke:#fffefb;stroke-width:6;filter:drop-shadow(0 4px 9px rgba(10,42,37,.2))}
-.node-avatar{clip-path:circle(47px at 47px 47px)}
-.node-initials{fill:#fff;font-size:19px;font-weight:850;letter-spacing:.04em}
-.node-divider{stroke:#e2eae6;stroke-width:1}
-.node-card.cherry-global .node-avatar-halo{stroke:#d2042d}
-.node-card.cherry-global .node-avatar-ring{stroke:#fff1f4}
-.cherry-badge rect{fill:#d2042d;stroke:none;filter:none}
-.node-card:hover .cherry-badge rect,.node-card:focus .cherry-badge rect{fill:#d2042d;stroke:none;filter:none}
-.cherry-badge text{fill:#fff;font-size:8px;font-weight:900;letter-spacing:.12em}
+.portrait-halo{fill:none;stroke:url(#brandOutline);stroke-width:4;filter:drop-shadow(0 0 9px rgba(0,169,157,.5));transition:stroke-width .28s ease,filter .28s ease}
+.portrait-bed{fill:#173746;stroke:#07131f;stroke-width:7}
+.node-avatar{transition:filter .28s ease}
+.node-card:hover .node-avatar,.node-card:focus .node-avatar{filter:brightness(1.08) saturate(1.08) contrast(1.03)}
+.node-card:hover .portrait-halo,.node-card:focus .portrait-halo{stroke-width:6;filter:drop-shadow(0 0 15px rgba(67,185,149,.9))}
+.node-card.cherry-global .portrait-halo{stroke:#df3151;filter:drop-shadow(0 0 10px rgba(210,4,45,.55))}
+.node-initials{fill:#e8fff7;font-size:21px;font-weight:850;letter-spacing:.04em}
+.node-card .cherry-badge rect,.node-card:hover .cherry-badge rect,.node-card:focus .cherry-badge rect{fill:#b81032;stroke:#ee5571;stroke-width:.8;filter:none}
+.cherry-badge text{fill:#fff;font-size:7px;font-weight:900;letter-spacing:.08em}
 .profile-affiliation{display:inline-flex;margin:.1rem 0 .5rem;padding:.38rem .65rem;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
-.profile-affiliation.cherry-global{border-color:#d2042d;background:#fce8ec;color:#b60024}
+.profile-affiliation.cherry-global{border-color:#df3151;background:rgba(210,4,45,.12);color:#ff9aae}
 .profile-team{margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--line)}
-.profile-team h3{font-family:Georgia,serif;font-size:1.25rem;margin:0 0 1rem}
-.profile-team-member{display:grid;grid-template-columns:auto 1fr auto;gap:.75rem;align-items:center;width:100%;padding:.7rem;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);text-align:left;cursor:pointer;margin-bottom:.6rem}
-.profile-team-member:hover{border-color:#00a99d;background:var(--paper)}
-.profile-team-member.cherry-global{border-left:3px solid #d2042d}
-.profile-team-member img,.profile-team-member>span:first-child{width:44px;height:44px;border-radius:50%;object-fit:cover;background:var(--brand-gradient);display:grid;place-items:center;color:#174d55;font-weight:800}
+.profile-team h3{font-size:1.15rem;margin:0 0 1rem}
+.profile-team-member{display:grid;grid-template-columns:auto 1fr auto;gap:.8rem;align-items:center;width:100%;padding:.8rem;border:1px solid rgba(126,216,190,.16);border-radius:16px;background:#0c202e;color:#effff9;text-align:left;cursor:pointer;margin-bottom:.65rem;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}
+.profile-team-member:hover{transform:translateY(-3px);border-color:#43b995;box-shadow:0 12px 24px rgba(0,10,20,.25)}
+.profile-team-member.cherry-global{border-left:3px solid #df3151}
+.profile-team-member img,.profile-team-member>span:first-child{width:52px;height:52px;border-radius:50%;object-fit:cover;background:linear-gradient(135deg,#b8dc78,#00a99d);display:grid;place-items:center;color:#08202b;font-weight:800;border:3px solid #102b36}
 .profile-team-member strong,.profile-team-member small{display:block}
-.profile-team-member small,.profile-team-empty{color:var(--muted);margin-top:.2rem}
-.mobile-person.cherry-global{border:2px solid #d2042d}
-.dark .node-avatar-halo{fill:#18251f}
-.dark .node-avatar-ring{stroke:#edf5f2}
-.dark .node-divider{stroke:#354940}
+.profile-team-member small,.profile-team-empty{color:#9ab8b6;margin-top:.2rem}
+@media(prefers-reduced-motion:reduce){.node-avatar,.portrait-halo,.profile-team-member{transition:none}.profile-team-member:hover{transform:none}}

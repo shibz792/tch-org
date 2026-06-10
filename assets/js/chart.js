@@ -1,5 +1,5 @@
 (() => {
-  const state = { data: [], departments: [], filter: '', search: '', collapsed: new Set(), zoom: null };
+  const state = { data: [], departments: [], filter: '', search: '', collapsed: new Set(), mobileCollapsed: new Set(), focusId: null, positions: new Map(), zoom: null };
   const chart = document.getElementById('chart');
   const mobile = document.getElementById('mobileChart');
   chart.querySelector('.loading')?.remove();
@@ -9,38 +9,35 @@
   outlineGradient.append('stop').attr('offset', '0%').attr('stop-color', '#b8dc78');
   outlineGradient.append('stop').attr('offset', '48%').attr('stop-color', '#43b995');
   outlineGradient.append('stop').attr('offset', '100%').attr('stop-color', '#00a99d');
-  const titleGradient = defs.append('linearGradient').attr('id', 'titleGradient').attr('x1', '0%').attr('y1', '0%').attr('x2', '100%').attr('y2', '0%');
-  titleGradient.append('stop').attr('offset', '0%').attr('stop-color', '#7fbf5b');
-  titleGradient.append('stop').attr('offset', '48%').attr('stop-color', '#169b82');
-  titleGradient.append('stop').attr('offset', '100%').attr('stop-color', '#087b76');
-  const flowGradient = defs.append('linearGradient').attr('id', 'flowGradient').attr('gradientUnits', 'userSpaceOnUse').attr('x1', '0').attr('y1', '0').attr('x2', '150').attr('y2', '0').attr('spreadMethod', 'repeat');
-  flowGradient.append('stop').attr('offset', '0%').attr('stop-color', '#174d55');
-  flowGradient.append('stop').attr('offset', '35%').attr('stop-color', '#00a99d');
-  flowGradient.append('stop').attr('offset', '68%').attr('stop-color', '#b8dc78');
-  flowGradient.append('stop').attr('offset', '100%').attr('stop-color', '#174d55');
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    flowGradient.append('animateTransform')
-      .attr('attributeName', 'gradientTransform')
-      .attr('type', 'translate')
-      .attr('from', '0 0')
-      .attr('to', '150 0')
-      .attr('dur', '2.4s')
-      .attr('repeatCount', 'indefinite');
-  }
-  const cardHeaderGradient = defs.append('linearGradient').attr('id', 'cardHeaderGradient').attr('x1', '0%').attr('y1', '0%').attr('x2', '100%').attr('y2', '100%');
-  cardHeaderGradient.append('stop').attr('offset', '0%').attr('stop-color', '#123a40');
-  cardHeaderGradient.append('stop').attr('offset', '58%').attr('stop-color', '#087b76');
-  cardHeaderGradient.append('stop').attr('offset', '100%').attr('stop-color', '#43b995');
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    outlineGradient.append('animateTransform')
-      .attr('attributeName', 'gradientTransform')
-      .attr('type', 'rotate')
-      .attr('from', '0 .5 .5')
-      .attr('to', '360 .5 .5')
-      .attr('dur', '2.8s')
-      .attr('repeatCount', 'indefinite');
-  }
+  const surfaceGradient = defs.append('linearGradient').attr('id', 'cardSurface').attr('x1', '0%').attr('y1', '0%').attr('x2', '100%').attr('y2', '100%');
+  surfaceGradient.append('stop').attr('offset', '0%').attr('stop-color', '#28525a');
+  surfaceGradient.append('stop').attr('offset', '55%').attr('stop-color', '#1d414b');
+  surfaceGradient.append('stop').attr('offset', '100%').attr('stop-color', '#15343e');
+  const hoverGradient = defs.append('linearGradient').attr('id', 'hoverSurface').attr('x1', '0%').attr('y1', '100%').attr('x2', '100%').attr('y2', '0%');
+  hoverGradient.append('stop').attr('offset', '0%').attr('stop-color', '#33706e');
+  hoverGradient.append('stop').attr('offset', '52%').attr('stop-color', '#24555a');
+  hoverGradient.append('stop').attr('offset', '100%').attr('stop-color', '#193e49');
+  const focusGradient = defs.append('linearGradient').attr('id', 'focusSurface').attr('x1', '0%').attr('y1', '0%').attr('x2', '100%').attr('y2', '100%');
+  focusGradient.append('stop').attr('offset', '0%').attr('stop-color', '#34706c');
+  focusGradient.append('stop').attr('offset', '52%').attr('stop-color', '#24505a');
+  focusGradient.append('stop').attr('offset', '100%').attr('stop-color', '#173a45');
+  const darkSurfaceGradient = defs.append('linearGradient').attr('id', 'darkCardSurface').attr('x1', '0%').attr('y1', '0%').attr('x2', '100%').attr('y2', '100%');
+  darkSurfaceGradient.append('stop').attr('offset', '0%').attr('stop-color', '#244750');
+  darkSurfaceGradient.append('stop').attr('offset', '52%').attr('stop-color', '#19343f');
+  darkSurfaceGradient.append('stop').attr('offset', '100%').attr('stop-color', '#102630');
+  const darkHoverGradient = defs.append('linearGradient').attr('id', 'darkHoverSurface').attr('x1', '0%').attr('y1', '100%').attr('x2', '100%').attr('y2', '0%');
+  darkHoverGradient.append('stop').attr('offset', '0%').attr('stop-color', '#2e6868');
+  darkHoverGradient.append('stop').attr('offset', '52%').attr('stop-color', '#21505a');
+  darkHoverGradient.append('stop').attr('offset', '100%').attr('stop-color', '#173844');
+  const darkFocusGradient = defs.append('linearGradient').attr('id', 'darkFocusSurface').attr('x1', '0%').attr('y1', '0%').attr('x2', '100%').attr('y2', '100%');
+  darkFocusGradient.append('stop').attr('offset', '0%').attr('stop-color', '#35736d');
+  darkFocusGradient.append('stop').attr('offset', '50%').attr('stop-color', '#24535b');
+  darkFocusGradient.append('stop').attr('offset', '100%').attr('stop-color', '#183943');
   const stage = svg.append('g');
+  const linkLayer = stage.append('g').attr('class', 'link-layer');
+  const energyTrailLayer = stage.append('g').attr('class', 'energy-trail-layer');
+  const energyLayer = stage.append('g').attr('class', 'energy-layer');
+  const nodeLayer = stage.append('g').attr('class', 'node-layer');
   const zoom = d3.zoom().scaleExtent([0.25, 2]).on('zoom', event => stage.attr('transform', event.transform));
   state.zoom = zoom;
   svg.call(zoom);
@@ -75,92 +72,186 @@
     return 'node-name';
   };
   const matches = p => {
-    const haystack = `${p.name} ${p.title} ${p.department} ${p.location}`.toLowerCase();
+    const haystack = `${p.name} ${p.title} ${p.department} ${p.location} ${p.warehouse_code} ${p.warehouse_name}`.toLowerCase();
     return (!state.search || haystack.includes(state.search)) && (!state.filter || text(p.department_id) === state.filter);
   };
   const prune = nodes => nodes.map(node => ({ ...node, children: prune(node.children || []) }))
     .filter(node => matches(node) || node.children.length);
+  const cloneTree = node => ({ ...node, children: (node.children || []).map(cloneTree) });
+  const focusTree = (nodes, id) => {
+    const visit = node => {
+      if (node.id === id) return cloneTree(node);
+      for (const child of node.children || []) {
+        const branch = visit(child);
+        if (branch) return { ...node, children: [branch] };
+      }
+      return null;
+    };
+    return nodes.map(visit).filter(Boolean);
+  };
+  const cardSize = d => d.data.id === state.focusId ? { width: 390, height: 300 } : { width: 330, height: 210 };
+  const cardTransform = d => {
+    const size = cardSize(d);
+    return `translate(${d.x - size.width / 2},${d.y})`;
+  };
+
+  function drawCard(visual, d) {
+    visual.selectAll('*').remove();
+    const person = d.data;
+    const focused = person.id === state.focusId;
+    const size = cardSize(d);
+    const portraitRadius = focused ? 62 : 48;
+    const portraitX = focused ? size.width / 2 : 68;
+    const portraitY = focused ? 62 : 54;
+    const surfaceY = focused ? 48 : 42;
+    const surfaceHeight = size.height - surfaceY;
+    const departmentColor = person.department_color || '#43b995';
+    const clipId = `portrait-${person.id}-${focused ? 'focus' : 'card'}`;
+    const clip = defs.selectAll(`#${clipId}`).data([null]).join('clipPath').attr('id', clipId);
+    clip.selectAll('circle').data([null]).join('circle').attr('cx', portraitX).attr('cy', portraitY).attr('r', portraitRadius - 5);
+
+    visual.append('rect').attr('class', 'node-aura').attr('x', 5).attr('y', surfaceY + 5)
+      .attr('width', size.width - 10).attr('height', surfaceHeight - 5).attr('rx', focused ? 30 : 25);
+    visual.append('rect').attr('class', 'node-surface').attr('x', 0).attr('y', surfaceY)
+      .attr('width', size.width).attr('height', surfaceHeight).attr('rx', focused ? 30 : 25);
+    visual.append('rect').attr('class', 'node-glow').attr('x', 1).attr('y', surfaceY + 1)
+      .attr('width', size.width - 2).attr('height', surfaceHeight - 2).attr('rx', focused ? 29 : 24);
+    visual.append('rect').attr('class', 'node-accent').attr('x', focused ? 30 : 132).attr('y', focused ? 157 : 79)
+      .attr('width', focused ? size.width - 60 : size.width - 158).attr('height', 3).attr('rx', 2).attr('fill', departmentColor);
+    visual.append('circle').attr('class', 'portrait-halo').attr('cx', portraitX).attr('cy', portraitY).attr('r', portraitRadius + 5);
+    visual.append('circle').attr('class', 'portrait-bed').attr('cx', portraitX).attr('cy', portraitY).attr('r', portraitRadius);
+    if (photo(person.photo_path)) {
+      visual.append('image').attr('class', 'node-avatar').attr('href', photo(person.photo_path))
+        .attr('x', portraitX - portraitRadius).attr('y', portraitY - portraitRadius)
+        .attr('width', portraitRadius * 2).attr('height', portraitRadius * 2)
+        .attr('preserveAspectRatio', 'xMidYMid slice').attr('clip-path', `url(#${clipId})`);
+    } else {
+      visual.append('text').attr('class', 'node-initials').attr('x', portraitX).attr('y', portraitY + 8)
+        .attr('text-anchor', 'middle').text(text(person.name).split(/\s+/).map(part => part[0]).slice(0, 2).join(''));
+    }
+
+    if (focused) {
+      const nameLines = textLines(person.name, 30, 2);
+      const titleY = 187 + ((nameLines.length - 1) * 22) + 25;
+      multiline(visual, person.name, size.width / 2, 187, 30, 2, nameClass(person.name), 22).attr('text-anchor', 'middle').selectAll('tspan').attr('x', size.width / 2);
+      multiline(visual, person.title || 'Role not listed', size.width / 2, titleY, 44, 2, 'node-role', 17).attr('text-anchor', 'middle').selectAll('tspan').attr('x', size.width / 2);
+      visual.append('text').attr('class', 'node-dept').attr('x', size.width / 2).attr('y', 147).attr('text-anchor', 'middle').text(person.department || 'Organization');
+      const manager = d.parent?.data?.id ? d.parent.data.name : 'Top level';
+      visual.append('text').attr('class', 'node-responsibility').attr('x', 30).attr('y', size.height - 18).text(`Reports to ${manager}`);
+      visual.append('text').attr('class', 'profile-hint').attr('x', size.width - 30).attr('y', size.height - 18).attr('text-anchor', 'end').text('Click again to view profile');
+    } else {
+      const nameLines = textLines(person.name, 21, 2);
+      const titleY = 111 + ((nameLines.length - 1) * 21) + 26;
+      multiline(visual, person.name, 132, 111, 21, 2, nameClass(person.name), 21);
+      multiline(visual, person.title || 'Role not listed', 132, titleY, 29, 2, 'node-role', 17);
+      visual.append('text').attr('class', 'node-dept').attr('x', 132).attr('y', 72).text(person.department || 'Organization');
+      visual.append('text').attr('class', 'node-responsibility').attr('x', 132).attr('y', size.height - 17)
+        .text(`${person.direct_reports || 0} direct report${Number(person.direct_reports) === 1 ? '' : 's'}`);
+    }
+    if (person.is_cherry_global) {
+      const badge = visual.append('g').attr('class', 'cherry-badge').attr('transform', `translate(${size.width - 91},${surfaceY + 15})`);
+      badge.append('rect').attr('width', 76).attr('height', 22).attr('rx', 11);
+      badge.append('text').attr('x', 38).attr('y', 14).attr('text-anchor', 'middle').text('CHERRY GLOBAL');
+    }
+    if (person.children?.length) {
+      const collapse = visual.append('g').attr('class', 'collapse-control')
+        .attr('transform', `translate(${size.width - 30},${size.height - 25})`)
+        .attr('role', 'button').attr('aria-label', state.collapsed.has(person.id) ? 'Expand team' : 'Collapse team')
+        .on('click', event => {
+          event.stopPropagation();
+          state.collapsed.has(person.id) ? state.collapsed.delete(person.id) : state.collapsed.add(person.id);
+          render();
+          setTimeout(fitToChart, 580);
+        });
+      collapse.append('circle').attr('r', 13);
+      collapse.append('text').attr('text-anchor', 'middle').attr('y', 4).text(state.collapsed.has(person.id) ? '+' : '−');
+    }
+  }
 
   function render() {
-    stage.selectAll('*').remove();
-    const filtered = prune(state.data);
+    const filteredAll = prune(state.data);
+    const filtered = state.focusId ? focusTree(filteredAll, state.focusId) : filteredAll;
     if (!filtered.length) {
-      stage.append('text').attr('x', 40).attr('y', 60).attr('fill', '#687671').text('No people match this view.');
+      nodeLayer.selectAll('*').remove(); linkLayer.selectAll('*').remove(); energyTrailLayer.selectAll('*').remove(); energyLayer.selectAll('*').remove();
+      nodeLayer.append('text').attr('class', 'empty-chart').attr('x', 40).attr('y', 60).text('No people match this view.');
       return;
     }
+    nodeLayer.selectAll('.empty-chart').remove();
     const virtualRoot = { name: 'Organization', children: filtered };
     const root = d3.hierarchy(virtualRoot, d => state.collapsed.has(d.id) ? null : d.children);
-    d3.tree().nodeSize([415, 340])(root);
+    d3.tree().nodeSize(state.focusId ? [470, 360] : [380, 285])(root);
     const nodes = root.descendants().slice(1);
     const links = root.links().filter(l => l.target.depth > 1);
     const linkPath = d => {
-      const sourceY = d.source.y + 260;
+      const sourceY = d.source.y + cardSize(d.source).height;
       const targetY = d.target.y;
       const middleY = sourceY + (targetY - sourceY) / 2;
       return `M${d.source.x},${sourceY}V${middleY}H${d.target.x}V${targetY}`;
     };
-    stage.selectAll('.link').data(links).enter().append('path').attr('class', 'link')
-      .attr('data-target-id', d => d.target.data.id)
-      .attr('d', linkPath)
-      .style('animation-delay', (_, index) => `${Math.min(index * 28, 420)}ms`);
-    const node = stage.selectAll('.node-card').data(nodes).enter().append('g')
-      .attr('class', d => `node-card ${d.depth === 1 ? 'top-level' : d.data.direct_reports ? 'manager' : 'individual'}${d.data.is_cherry_global ? ' cherry-global' : ''}`)
-      .style('animation-delay', (_, index) => `${Math.min(index * 34, 520)}ms`)
-      .attr('tabindex', 0).attr('role', 'button').attr('aria-label', d => `${d.data.name}, ${d.data.title}`)
-      .attr('transform', d => `translate(${d.x - 180},${d.y})`)
-      .on('click', (_, d) => openProfile(d.data.id))
+    const transition = svg.transition().duration(550).ease(d3.easeCubicInOut);
+    const link = linkLayer.selectAll('.link').data(links, d => d.target.data.id);
+    link.exit().transition(transition).style('opacity', 0).remove();
+    link.enter().append('path').attr('class', 'link').attr('pathLength', 1)
+      .attr('d', d => {
+        const old = state.positions.get(d.source.data.id) || d.source;
+        return `M${old.x},${old.y}V${old.y}H${old.x}V${old.y}`;
+      })
+      .merge(link).transition(transition).attr('d', linkPath).style('opacity', 1);
+    const energyTrail = energyTrailLayer.selectAll('.link-energy-trail').data(links, d => d.target.data.id);
+    energyTrail.exit().transition(transition).style('opacity', 0).remove();
+    energyTrail.enter().append('path').attr('class', 'link-energy-trail').attr('pathLength', 1)
+      .attr('d', d => {
+        const old = state.positions.get(d.source.data.id) || d.source;
+        return `M${old.x},${old.y}V${old.y}H${old.x}V${old.y}`;
+      })
+      .merge(energyTrail).transition(transition).attr('d', linkPath);
+    const energy = energyLayer.selectAll('.link-energy').data(links, d => d.target.data.id);
+    energy.exit().transition(transition).style('opacity', 0).remove();
+    energy.enter().append('path').attr('class', 'link-energy').attr('pathLength', 1)
+      .attr('d', d => {
+        const old = state.positions.get(d.source.data.id) || d.source;
+        return `M${old.x},${old.y}V${old.y}H${old.x}V${old.y}`;
+      })
+      .merge(energy).transition(transition).attr('d', linkPath);
+    const nodeJoin = nodeLayer.selectAll('.node-card').data(nodes, d => d.data.id);
+    nodeJoin.exit().transition(transition).style('opacity', 0).remove();
+    const nodeEnter = nodeJoin.enter().append('g').attr('class', 'node-card').style('opacity', 0)
+      .attr('transform', d => {
+        const old = state.positions.get(d.data.id);
+        return old ? `translate(${old.x},${old.y})` : cardTransform(d);
+      })
+      .attr('tabindex', 0).attr('role', 'button');
+    nodeEnter.append('g').attr('class', 'card-visual');
+    const node = nodeEnter.merge(nodeJoin)
+      .attr('class', d => `node-card ${d.depth === 1 ? 'top-level' : d.data.direct_reports ? 'manager' : 'individual'}${d.data.id === state.focusId ? ' focused' : ''}${d.data.is_cherry_global ? ' cherry-global' : ''}`)
+      .attr('aria-label', d => `${d.data.name}, ${d.data.title}`)
+      .on('click', (event, d) => {
+        event.stopPropagation();
+        if (state.focusId === d.data.id) openProfile(d.data.id);
+        else { state.focusId = d.data.id; render(); setTimeout(fitToChart, 580); }
+      })
       .on('mouseenter', (_, d) => focusPath(d))
       .on('mouseleave', clearPath)
       .on('focus', (_, d) => focusPath(d))
       .on('blur', clearPath)
-      .on('keydown', (event, d) => { if (event.key === 'Enter' || event.key === ' ') openProfile(d.data.id); });
-    node.append('rect').attr('class', 'node-surface').attr('width', 360).attr('height', 260).attr('rx', 26);
-    node.append('rect').attr('class', 'gradient-outline').attr('x', -3).attr('y', -3).attr('width', 366).attr('height', 266).attr('rx', 29);
-    node.append('path').attr('class', 'node-header').attr('d', 'M26,0H334A26,26 0 0 1 360,26V98H0V26A26,26 0 0 1 26,0Z');
-    node.append('circle').attr('class', 'header-orb header-orb-large').attr('cx', 328).attr('cy', 20).attr('r', 64);
-    node.append('circle').attr('class', 'header-orb header-orb-small').attr('cx', 272).attr('cy', 86).attr('r', 28);
-    node.append('image').attr('class', 'node-watermark').attr('x', 255).attr('y', 148).attr('width', 78).attr('height', 54)
-      .attr('href', '/assets/tch-logo.png').attr('preserveAspectRatio', 'xMidYMid meet').attr('aria-hidden', 'true');
-    node.append('rect').attr('class', 'node-accent').attr('x', 154).attr('y', 0).attr('width', 86).attr('height', 4).attr('rx', 2)
-      .style('fill', d => d.data.is_cherry_global ? '#d2042d' : (d.data.department_color || '#00a99d'));
-    node.filter(d => d.data.is_cherry_global).append('g').attr('class', 'cherry-badge').call(badge => {
-      badge.append('rect').attr('x', 274).attr('y', 16).attr('width', 68).attr('height', 22).attr('rx', 11);
-      badge.append('text').attr('x', 308).attr('y', 31).attr('text-anchor', 'middle').text('CHERRY');
-    });
-    node.append('circle').attr('class', 'node-avatar-halo').attr('cx', 72).attr('cy', 91).attr('r', 58);
-    node.append('circle').attr('class', 'node-avatar-ring').attr('cx', 72).attr('cy', 91).attr('r', 51)
-      .attr('fill', d => d.data.department_color || '#00a99d');
-    node.filter(d => d.data.photo_path).append('image').attr('class', 'node-avatar').attr('x', 25).attr('y', 44)
-      .attr('width', 94).attr('height', 94).attr('href', d => d.data.photo_path)
-      .attr('preserveAspectRatio', 'xMidYMid slice');
-    node.filter(d => !d.data.photo_path).append('text').attr('class', 'node-initials').attr('x', 72).attr('y', 99)
-      .attr('text-anchor', 'middle').text(d => text(d.data.name).split(/\s+/).slice(0, 2).map(part => part[0]).join(''));
-    node.append('rect').attr('class', 'department-pill').attr('x', 150).attr('y', 52).attr('width', 192).attr('height', 28).attr('rx', 14);
-    node.append('circle').attr('cx', 167).attr('cy', 66).attr('r', 4).attr('fill', d => d.data.department_color || '#b8dc78');
-    node.append('text').attr('class', 'node-dept').attr('x', 179).attr('y', 70).text(d => text(d.data.department || 'Organization').slice(0, 24));
-    node.each(function(d) {
-      const nameLines = textLines(d.data.name, 21, 2);
-      const card = d3.select(this);
-      const name = card.append('text').attr('class', nameClass(d.data.name)).attr('x', 150).attr('y', 128);
-      nameLines.forEach((line, index) => name.append('tspan').attr('x', 150).attr('dy', index === 0 ? 0 : 21).text(line));
-      const titleY = 128 + ((nameLines.length - 1) * 21) + 32;
-      multiline(card, d.data.title || 'Role not listed', 150, titleY, 25, 2, 'node-title node-role', 19);
-    });
-    node.append('line').attr('class', 'node-divider').attr('x1', 24).attr('x2', 336).attr('y1', 220).attr('y2', 220);
-    node.append('circle').attr('class', 'status-dot').attr('cx', 29).attr('cy', 240).attr('r', 4);
-    node.append('text').attr('class', 'node-title node-responsibility').attr('x', 41).attr('y', 244).text(d => d.data.direct_reports ? `${d.data.direct_reports} direct reports` : 'Individual contributor');
-    node.filter(d => (d.data.children || []).length).append('circle').attr('class', 'collapse-control').attr('cx', 336).attr('cy', 240).attr('r', 12).attr('fill', '#00a99d')
-      .on('click', (event, d) => { event.stopPropagation(); state.collapsed.has(d.data.id) ? state.collapsed.delete(d.data.id) : state.collapsed.add(d.data.id); render(); requestAnimationFrame(fitToChart); });
-    node.filter(d => (d.data.children || []).length).append('text').attr('x', 336).attr('y', 244).attr('text-anchor', 'middle').attr('fill', 'white').attr('font-size', 12).attr('pointer-events', 'none').text(d => state.collapsed.has(d.data.id) ? '+' : '−');
+      .on('keydown', (event, d) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        if (state.focusId === d.data.id) openProfile(d.data.id);
+        else { state.focusId = d.data.id; render(); setTimeout(fitToChart, 580); }
+      });
+    node.select('.card-visual').each(function(d) { drawCard(d3.select(this), d); });
+    node.transition(transition).attr('transform', cardTransform).style('opacity', 1);
+    nodes.forEach(d => state.positions.set(d.data.id, { x: d.x - cardSize(d).width / 2, y: d.y }));
     function focusPath(d) {
       const pathIds = new Set(d.ancestors().slice(0, -1).map(item => item.data.id));
       stage.classed('has-focus', true);
       stage.selectAll('.node-card').classed('path-focus', item => pathIds.has(item.data.id)).classed('path-muted', item => !pathIds.has(item.data.id));
-      stage.selectAll('.link').classed('path-focus', link => pathIds.has(link.target.data.id)).classed('path-muted', link => !pathIds.has(link.target.data.id));
+      stage.selectAll('.link,.link-energy-trail,.link-energy').classed('path-focus', link => pathIds.has(link.target.data.id)).classed('path-muted', link => !pathIds.has(link.target.data.id));
     }
     function clearPath() {
       stage.classed('has-focus', false);
-      stage.selectAll('.node-card,.link').classed('path-focus', false).classed('path-muted', false);
+      stage.selectAll('.node-card,.link,.link-energy-trail,.link-energy').classed('path-focus', false).classed('path-muted', false);
     }
   }
 
@@ -174,11 +265,22 @@
         const button = document.createElement('button'); button.className = `mobile-person${person.is_cherry_global ? ' cherry-global' : ''}`;
         const avatar = document.createElement(photo(person.photo_path) ? 'img' : 'span');
         if (photo(person.photo_path)) { avatar.src = photo(person.photo_path); avatar.alt = ''; } else { avatar.className = 'avatar-fallback'; avatar.textContent = text(person.name).charAt(0); }
-        const info = document.createElement('span'); const strong = document.createElement('strong'); const small = document.createElement('small');
-        strong.textContent = person.name; small.textContent = person.title || 'Role not listed'; info.append(strong, small);
-        const count = document.createElement('span'); count.textContent = person.children?.length ? `${person.children.length} ›` : 'View';
-        button.append(avatar, info, count); button.addEventListener('click', () => openProfile(person.id)); wrap.append(button);
-        if (person.children?.length) { const children = document.createElement('div'); children.className = 'mobile-children open'; children.append(make(person.children)); wrap.append(children); }
+        const info = document.createElement('span'); const strong = document.createElement('strong'); const small = document.createElement('small'); const department = document.createElement('em');
+        strong.textContent = person.name; small.textContent = person.title || 'Role not listed'; department.className = 'mobile-department'; department.textContent = person.department || 'Organization'; info.append(strong, small, department);
+        const action = document.createElement('span'); action.className = 'mobile-profile-action'; action.textContent = 'Profile';
+        button.append(avatar, info, action); button.addEventListener('click', () => openProfile(person.id)); wrap.append(button);
+        if (person.children?.length) {
+          const toggle = document.createElement('button'); toggle.className = 'mobile-branch-toggle';
+          const isCollapsed = state.mobileCollapsed.has(person.id);
+          toggle.textContent = `${isCollapsed ? 'Show' : 'Hide'} ${person.children.length} direct report${person.children.length === 1 ? '' : 's'}`;
+          toggle.setAttribute('aria-expanded', String(!isCollapsed));
+          toggle.addEventListener('click', () => {
+            isCollapsed ? state.mobileCollapsed.delete(person.id) : state.mobileCollapsed.add(person.id);
+            renderMobile();
+          });
+          wrap.append(toggle);
+          const children = document.createElement('div'); children.className = `mobile-children${isCollapsed ? '' : ' open'}`; children.append(make(person.children)); wrap.append(children);
+        }
         fragment.append(wrap);
       }); return fragment;
     };
@@ -195,7 +297,7 @@
     const affiliation = document.createElement('div'); affiliation.className = p.is_cherry_global ? 'profile-affiliation cherry-global' : 'profile-affiliation';
     affiliation.textContent = p.is_cherry_global ? 'Cherry Global Resource' : 'Tech Cargo Hub Resource';
     const grid = document.createElement('div'); grid.className = 'profile-grid';
-    [['Manager',p.manager_name||'Top level'],['Location',p.location||'Not listed'],['Email',p.email||'Not listed'],['Phone',p.phone||'Not listed']].forEach(([label,value]) => { const box=document.createElement('div');box.className='profile-field';const s=document.createElement('small');s.textContent=label;const v=document.createElement('strong');v.textContent=value;box.append(s,v);grid.append(box); });
+    [['Manager',p.manager_name||'Top level'],['Warehouse',p.warehouse_code ? `${p.warehouse_code}${p.warehouse_name ? ` · ${p.warehouse_name}` : ''}` : 'Not assigned'],['Location',p.location||p.warehouse_location||'Not listed'],['Email',p.email||'Not listed'],['Phone',p.phone||'Not listed']].forEach(([label,value]) => { const box=document.createElement('div');box.className='profile-field';const s=document.createElement('small');s.textContent=label;const v=document.createElement('strong');v.textContent=value;box.append(s,v);grid.append(box); });
     const bio = document.createElement('p'); bio.className = 'profile-bio'; bio.textContent = p.bio || 'Profile details will be added soon.';
     const teamSection = document.createElement('section'); teamSection.className = 'profile-team';
     const teamHeading = document.createElement('h3'); teamHeading.textContent = `Handles ${p.direct_reports?.length || 0} direct reports`; teamSection.append(teamHeading);
@@ -229,6 +331,12 @@
     const y = padding - scale * bounds.y;
     svg.transition().duration(350).call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));
   };
+  svg.on('click.reset-focus', event => {
+    if (event.defaultPrevented || !state.focusId || event.target !== svg.node()) return;
+    state.focusId = null;
+    render();
+    setTimeout(fitToChart, 580);
+  });
   document.getElementById('fitChart').onclick = fitToChart;
   const workspace = document.querySelector('.workspace');
   const presentButton = document.getElementById('fullscreen');
@@ -249,7 +357,17 @@
     setTimeout(fitToChart, 120);
   });
   document.getElementById('printChart').onclick = () => window.print();
-  document.getElementById('themeToggle').onclick = () => document.documentElement.classList.toggle('dark');
+  const themeButton = document.getElementById('themeToggle');
+  const applyTheme = dark => {
+    document.documentElement.classList.toggle('dark', dark);
+    themeButton.textContent = dark ? '☀' : '◐';
+    themeButton.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    try { localStorage.setItem('orgchart-theme', dark ? 'dark' : 'light'); } catch (_) {}
+  };
+  let savedTheme = '';
+  try { savedTheme = localStorage.getItem('orgchart-theme') || ''; } catch (_) {}
+  applyTheme(savedTheme === 'dark');
+  themeButton.onclick = () => applyTheme(!document.documentElement.classList.contains('dark'));
   fetch('/api/?route=hierarchy').then(r => {
     if (!r.ok) throw new Error(`Chart request failed with status ${r.status}`);
     return r.json();

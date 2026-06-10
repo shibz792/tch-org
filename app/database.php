@@ -31,11 +31,23 @@ CREATE TABLE IF NOT EXISTS departments (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS warehouses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    name TEXT NOT NULL,
+    location TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','inactive')),
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS personnel (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     title TEXT NOT NULL DEFAULT '',
     department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+    warehouse_id INTEGER REFERENCES warehouses(id) ON DELETE SET NULL,
     location TEXT NOT NULL DEFAULT '',
     email TEXT UNIQUE,
     phone TEXT NOT NULL DEFAULT '',
@@ -85,10 +97,22 @@ CREATE TABLE IF NOT EXISTS login_attempts (
 );
 CREATE INDEX IF NOT EXISTS idx_personnel_manager ON personnel(manager_id);
 CREATE INDEX IF NOT EXISTS idx_personnel_department ON personnel(department_id);
+CREATE INDEX IF NOT EXISTS idx_personnel_warehouse ON personnel(warehouse_id);
 CREATE INDEX IF NOT EXISTS idx_personnel_status ON personnel(status);
+CREATE INDEX IF NOT EXISTS idx_warehouses_status ON warehouses(status);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
 SQL;
     db()->exec($schema);
+
+    $personnelColumns = db()->query('PRAGMA table_info(personnel)')->fetchAll();
+    if (!in_array('warehouse_id', array_column($personnelColumns, 'name'), true)) {
+        db()->exec('ALTER TABLE personnel ADD COLUMN warehouse_id INTEGER REFERENCES warehouses(id) ON DELETE SET NULL');
+        db()->exec('CREATE INDEX IF NOT EXISTS idx_personnel_warehouse ON personnel(warehouse_id)');
+    }
+
+    $warehouse = db()->prepare('INSERT OR IGNORE INTO warehouses(code, name, display_order) VALUES(?, ?, ?)');
+    $warehouse->execute(['TCH1', 'TCH Warehouse 1', 1]);
+    $warehouse->execute(['TCH2', 'TCH Warehouse 2', 2]);
 
     $defaults = [
         'organization_name' => 'Tech Cargo Hub',

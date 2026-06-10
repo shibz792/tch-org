@@ -11,12 +11,23 @@ function departments(): array
     return db()->query('SELECT * FROM departments ORDER BY display_order, name')->fetchAll();
 }
 
+function warehouses(bool $includeInactive = true): array
+{
+    $where = $includeInactive ? '' : "WHERE status = 'active'";
+    return db()->query("SELECT w.*,
+        (SELECT COUNT(*) FROM personnel p WHERE p.warehouse_id = w.id AND p.status = 'active') AS personnel_count
+        FROM warehouses w $where ORDER BY w.display_order, w.code")->fetchAll();
+}
+
 function personnel(bool $includeArchived = false): array
 {
     $where = $includeArchived ? '' : "WHERE p.status = 'active'";
     return db()->query("SELECT p.*, d.name AS department, d.color AS department_color,
+        w.code AS warehouse_code, w.name AS warehouse_name, w.location AS warehouse_location,
         (SELECT COUNT(*) FROM personnel c WHERE c.manager_id = p.id AND c.status = 'active') AS direct_reports
-        FROM personnel p LEFT JOIN departments d ON d.id = p.department_id $where
+        FROM personnel p
+        LEFT JOIN departments d ON d.id = p.department_id
+        LEFT JOIN warehouses w ON w.id = p.warehouse_id $where
         ORDER BY p.display_order, p.name")->fetchAll();
 }
 
@@ -52,6 +63,9 @@ function public_hierarchy_data(): array
             'department' => $person['department'],
             'department_color' => $person['department_color'],
             'location' => $person['location'],
+            'warehouse_id' => $person['warehouse_id'] ? (int) $person['warehouse_id'] : null,
+            'warehouse_code' => $person['warehouse_code'],
+            'warehouse_name' => $person['warehouse_name'],
             'photo_path' => $person['photo_path'],
             'is_cherry_global' => (bool) $person['is_cherry_global'],
             'direct_reports' => (int) $person['direct_reports'],
@@ -68,6 +82,7 @@ function validate_person(array $input, ?int $id = null): array
     $status = $input['status'] ?? 'active';
     $managerId = ($input['manager_id'] ?? '') === '' ? null : (int) $input['manager_id'];
     $departmentId = ($input['department_id'] ?? '') === '' ? null : (int) $input['department_id'];
+    $warehouseId = ($input['warehouse_id'] ?? '') === '' ? null : (int) $input['warehouse_id'];
     $email = trim((string) ($input['email'] ?? '')) ?: null;
     $errors = [];
     if ($name === '') $errors[] = 'Name is required.';
@@ -84,10 +99,15 @@ function validate_person(array $input, ?int $id = null): array
         $stmt->execute([$departmentId]);
         if (!$stmt->fetchColumn()) $errors[] = 'Selected department does not exist.';
     }
+    if ($warehouseId) {
+        $stmt = db()->prepare('SELECT COUNT(*) FROM warehouses WHERE id = ?');
+        $stmt->execute([$warehouseId]);
+        if (!$stmt->fetchColumn()) $errors[] = 'Selected warehouse does not exist.';
+    }
     if ($managerId && $id && creates_cycle($id, $managerId)) $errors[] = 'That reporting line would create a circular hierarchy.';
     if ($errors) throw new InvalidArgumentException(implode(' ', $errors));
     return [
-        'name' => $name, 'title' => $title, 'department_id' => $departmentId,
+        'name' => $name, 'title' => $title, 'department_id' => $departmentId, 'warehouse_id' => $warehouseId,
         'location' => trim((string) ($input['location'] ?? '')), 'email' => $email,
         'phone' => trim((string) ($input['phone'] ?? '')), 'bio' => trim((string) ($input['bio'] ?? '')),
         'status' => $status, 'manager_id' => $managerId,
@@ -123,11 +143,11 @@ function save_person(array $input, ?int $id = null, ?array $file = null): int
             $before = $stmt->fetch();
             if (!$before) throw new InvalidArgumentException('Person not found.');
             $photo = $photo ?: $before['photo_path'];
-            $sql = 'UPDATE personnel SET name=?, title=?, department_id=?, location=?, email=?, phone=?, bio=?, status=?, manager_id=?, display_order=?, is_cherry_global=?, photo_path=?, updated_at=CURRENT_TIMESTAMP WHERE id=?';
+            $sql = 'UPDATE personnel SET name=?, title=?, department_id=?, warehouse_id=?, location=?, email=?, phone=?, bio=?, status=?, manager_id=?, display_order=?, is_cherry_global=?, photo_path=?, updated_at=CURRENT_TIMESTAMP WHERE id=?';
             db()->prepare($sql)->execute([...array_values($data), $photo, $id]);
             audit('update', 'personnel', $id, $before, [...$data, 'photo_path' => $photo]);
         } else {
-            $sql = 'INSERT INTO personnel(name,title,department_id,location,email,phone,bio,status,manager_id,display_order,is_cherry_global,photo_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)';
+            $sql = 'INSERT INTO personnel(name,title,department_id,warehouse_id,location,email,phone,bio,status,manager_id,display_order,is_cherry_global,photo_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)';
             db()->prepare($sql)->execute([...array_values($data), $photo]);
             $id = (int) db()->lastInsertId();
             audit('create', 'personnel', $id, null, [...$data, 'photo_path' => $photo]);
