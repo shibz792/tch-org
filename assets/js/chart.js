@@ -1,5 +1,5 @@
 (() => {
-  const state = { data: [], departments: [], filter: '', search: '', collapsed: new Set(), mobileCollapsed: new Set(), focusId: null, positions: new Map(), zoom: null };
+  const state = { data: [], departments: [], filter: '', search: '', viewMode: 'compact', collapsed: new Set(), mobileCollapsed: new Set(), focusId: null, positions: new Map(), zoom: null };
   const chart = document.getElementById('chart');
   const mobile = document.getElementById('mobileChart');
   chart.querySelector('.loading')?.remove();
@@ -41,6 +41,7 @@
   const zoom = d3.zoom().scaleExtent([0.25, 2]).on('zoom', event => stage.attr('transform', event.transform));
   state.zoom = zoom;
   svg.call(zoom);
+  const panelLayer = stage.insert('g', '.link-layer').attr('class', 'panel-layer');
 
   const text = value => String(value ?? '');
   const photo = value => value || '';
@@ -129,6 +130,20 @@
     const size = cardSize(d);
     return `translate(${d.x - size.width / 2},${d.y})`;
   };
+  const compactSize = { width: 150, height: 150 };
+  const compactTransform = d => `translate(${d.x - compactSize.width / 2},${d.y})`;
+  const clearChart = () => {
+    panelLayer.selectAll('*').remove();
+    nodeLayer.selectAll('*').remove();
+    linkLayer.selectAll('*').remove();
+    energyTrailLayer.selectAll('*').remove();
+    energyLayer.selectAll('*').remove();
+  };
+  const showEmpty = () => {
+    clearChart();
+    nodeLayer.append('text').attr('class', 'empty-chart').attr('x', 40).attr('y', 60).text('No people match this view.');
+  };
+  const render = () => state.viewMode === 'compact' ? renderCompact() : renderDetailed();
 
   function drawCard(visual, d) {
     visual.selectAll('*').remove();
@@ -203,12 +218,119 @@
     }
   }
 
-  function render() {
+  function drawCompactCard(visual, d) {
+    visual.selectAll('*').remove();
+    const person = d.data;
+    const departmentColor = person.department_color || '#43b995';
+    const portraitRadius = 27;
+    const portraitX = compactSize.width / 2;
+    const portraitY = 38;
+    const clipId = `compact-portrait-${person.id}`;
+    const clip = defs.selectAll(`#${clipId}`).data([null]).join('clipPath').attr('id', clipId);
+    clip.selectAll('circle').data([null]).join('circle').attr('cx', portraitX).attr('cy', portraitY).attr('r', portraitRadius - 3);
+
+    visual.append('rect').attr('class', 'node-aura compact-aura').attr('x', 4).attr('y', 8)
+      .attr('width', compactSize.width - 8).attr('height', compactSize.height - 10).attr('rx', 22);
+    visual.append('rect').attr('class', 'node-surface compact-surface').attr('x', 0).attr('y', 0)
+      .attr('width', compactSize.width).attr('height', compactSize.height).attr('rx', 22);
+    visual.append('rect').attr('class', 'node-accent compact-accent').attr('x', 0).attr('y', 0)
+      .attr('width', compactSize.width).attr('height', 4).attr('rx', 2).attr('fill', departmentColor);
+    visual.append('circle').attr('class', 'portrait-halo compact-halo').attr('cx', portraitX).attr('cy', portraitY).attr('r', portraitRadius + 3);
+    visual.append('circle').attr('class', 'portrait-bed compact-bed').attr('cx', portraitX).attr('cy', portraitY).attr('r', portraitRadius);
+    if (photo(person.photo_path)) {
+      visual.append('image').attr('class', 'node-avatar compact-avatar').attr('href', photo(person.photo_path))
+        .attr('x', portraitX - portraitRadius).attr('y', portraitY - portraitRadius)
+        .attr('width', portraitRadius * 2).attr('height', portraitRadius * 2)
+        .attr('preserveAspectRatio', 'xMidYMid slice').attr('clip-path', `url(#${clipId})`);
+    } else {
+      visual.append('text').attr('class', 'node-initials compact-initials').attr('x', portraitX).attr('y', portraitY + 7)
+        .attr('text-anchor', 'middle').text(text(person.name).split(/\s+/).map(part => part[0]).slice(0, 2).join(''));
+    }
+    fittedText(visual, person.name, compactSize.width / 2, 82, compactSize.width - 22, 2, 'compact-name', 15, 'middle');
+    fittedText(visual, person.title || 'Role not listed', compactSize.width / 2, 113, compactSize.width - 24, 1, 'compact-role', 13, 'middle');
+    fittedSingle(visual, person.department || 'Organization', compactSize.width / 2, 132, compactSize.width - 28, 'compact-dept', 'middle');
+    visual.append('text').attr('class', 'compact-count').attr('x', compactSize.width / 2).attr('y', compactSize.height - 7)
+      .attr('text-anchor', 'middle').text(`${person.direct_reports || 0} report${Number(person.direct_reports) === 1 ? '' : 's'}`);
+  }
+
+  function renderCompact() {
+    const filtered = prune(state.data);
+    state.focusId = null;
+    state.positions.clear();
+    chart.classList.add('compact-scroll');
+    svg.on('.zoom', null);
+    if (!filtered.length) {
+      svg.attr('height', '100%');
+      showEmpty();
+      return;
+    }
+    nodeLayer.selectAll('.empty-chart').remove();
+    panelLayer.selectAll('*').remove();
+    energyTrailLayer.selectAll('*').remove();
+    energyLayer.selectAll('*').remove();
+    svg.attr('height', '100%');
+    const virtualRoot = { name: 'Organization', children: filtered };
+    const root = d3.hierarchy(virtualRoot, d => d.children);
+    d3.tree().nodeSize([172, 162]).separation((a, b) => a.parent === b.parent ? 1 : 1.08)(root);
+    const nodes = root.descendants().slice(1);
+    const links = root.links().filter(l => l.target.depth > 1);
+    const linkPath = d => {
+      const sourceX = d.source.x;
+      const sourceY = d.source.y + compactSize.height;
+      const targetX = d.target.x;
+      const targetY = d.target.y;
+      const middleY = sourceY + (targetY - sourceY) / 2;
+      return `M${sourceX},${sourceY}V${middleY}H${targetX}V${targetY}`;
+    };
+    const transition = svg.transition().duration(420).ease(d3.easeCubicInOut);
+    const link = linkLayer.selectAll('.link').data(links, d => d.target.data.id);
+    link.exit().transition(transition).style('opacity', 0).remove();
+    link.enter().append('path').attr('class', 'link compact-link').attr('pathLength', 1)
+      .attr('d', d => `M${d.source.x},${d.source.y + compactSize.height}V${d.source.y + compactSize.height}`)
+      .merge(link).attr('class', 'link compact-link').transition(transition).attr('d', linkPath).style('opacity', 1);
+
+    const nodeJoin = nodeLayer.selectAll('.node-card').data(nodes, d => d.data.id);
+    nodeJoin.exit().transition(transition).style('opacity', 0).remove();
+    const nodeEnter = nodeJoin.enter().append('g').attr('class', 'node-card compact-card').style('opacity', 0)
+      .attr('transform', compactTransform).attr('tabindex', 0).attr('role', 'button');
+    nodeEnter.append('g').attr('class', 'card-visual compact-visual');
+    const node = nodeEnter.merge(nodeJoin)
+      .attr('class', d => `node-card compact-card ${d.depth === 0 ? 'top-level' : d.data.direct_reports ? 'manager' : 'individual'}${d.data.is_cherry_global ? ' cherry-global' : ''}`)
+      .attr('aria-label', d => `${d.data.name}, ${d.data.title}`)
+      .on('click', (event, d) => { event.stopPropagation(); openProfile(d.data.id); })
+      .on('mouseenter', (_, d) => focusCompactPath(d))
+      .on('mouseleave', clearCompactPath)
+      .on('focus', (_, d) => focusCompactPath(d))
+      .on('blur', clearCompactPath)
+      .on('keydown', (event, d) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        openProfile(d.data.id);
+      });
+    node.select('.card-visual').each(function(d) { drawCompactCard(d3.select(this), d); });
+    node.transition(transition).attr('transform', compactTransform).style('opacity', 1);
+    nodes.forEach(d => state.positions.set(d.data.id, { x: d.x - compactSize.width / 2, y: d.y }));
+
+    function focusCompactPath(d) {
+      const pathIds = new Set(d.ancestors().slice(0, -1).map(item => item.data.id));
+      stage.classed('has-focus', true);
+      stage.selectAll('.node-card').classed('path-focus', item => pathIds.has(item.data.id)).classed('path-muted', item => !pathIds.has(item.data.id));
+      stage.selectAll('.link').classed('path-focus', link => pathIds.has(link.target.data.id)).classed('path-muted', link => !pathIds.has(link.target.data.id));
+    }
+    function clearCompactPath() {
+      stage.classed('has-focus', false);
+      stage.selectAll('.node-card,.link').classed('path-focus', false).classed('path-muted', false);
+    }
+  }
+
+  function renderDetailed() {
+    chart.classList.remove('compact-scroll');
+    svg.attr('height', '100%').call(zoom);
+    panelLayer.selectAll('*').remove();
     const filteredAll = prune(state.data);
     const filtered = state.focusId ? focusTree(filteredAll, state.focusId) : filteredAll;
     if (!filtered.length) {
-      nodeLayer.selectAll('*').remove(); linkLayer.selectAll('*').remove(); energyTrailLayer.selectAll('*').remove(); energyLayer.selectAll('*').remove();
-      nodeLayer.append('text').attr('class', 'empty-chart').attr('x', 40).attr('y', 60).text('No people match this view.');
+      showEmpty();
       return;
     }
     nodeLayer.selectAll('.empty-chart').remove();
@@ -231,7 +353,7 @@
         const old = state.positions.get(d.source.data.id) || d.source;
         return `M${old.x},${old.y}V${old.y}H${old.x}V${old.y}`;
       })
-      .merge(link).transition(transition).attr('d', linkPath).style('opacity', 1);
+      .merge(link).attr('class', 'link').transition(transition).attr('d', linkPath).style('opacity', 1);
     const energyTrail = energyTrailLayer.selectAll('.link-energy-trail').data(links, d => d.target.data.id);
     energyTrail.exit().transition(transition).style('opacity', 0).remove();
     energyTrail.enter().append('path').attr('class', 'link-energy-trail').attr('pathLength', 1)
@@ -358,12 +480,32 @@
   document.getElementById('closeDrawer').onclick = close; document.getElementById('drawerBackdrop').onclick = close;
   document.getElementById('searchInput').oninput = e => { state.search = e.target.value.trim().toLowerCase(); render(); renderMobile(); };
   document.getElementById('departmentFilter').onchange = e => { state.filter = e.target.value; render(); renderMobile(); };
+  document.querySelectorAll('[data-view-mode]').forEach(button => {
+    button.addEventListener('click', () => {
+      const mode = button.dataset.viewMode;
+      if (!mode || state.viewMode === mode) return;
+      state.viewMode = mode;
+      state.focusId = null;
+      state.positions.clear();
+      document.querySelectorAll('[data-view-mode]').forEach(item => {
+        const active = item.dataset.viewMode === mode;
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-pressed', String(active));
+      });
+      render();
+      setTimeout(fitToChart, 450);
+    });
+  });
   document.getElementById('zoomIn').onclick = () => svg.transition().call(zoom.scaleBy, 1.25); document.getElementById('zoomOut').onclick = () => svg.transition().call(zoom.scaleBy, .8);
   const fitToChart = () => {
     const bounds = stage.node()?.getBBox();
     if (!bounds || !bounds.width || !bounds.height) return;
-    const padding = 70;
-    const scale = Math.max(.25, Math.min(1, Math.min((chart.clientWidth - padding * 2) / bounds.width, (chart.clientHeight - padding * 2) / bounds.height)));
+    const padding = state.viewMode === 'compact' ? 42 : 70;
+    const availableWidth = Math.max(320, chart.clientWidth - padding * 2);
+    const availableHeight = Math.max(260, chart.clientHeight - padding * 2);
+    const scale = state.viewMode === 'compact'
+      ? Math.max(.48, Math.min(1, Math.min(availableWidth / bounds.width, availableHeight / bounds.height)))
+      : Math.max(.25, Math.min(1, Math.min(availableWidth / bounds.width, availableHeight / bounds.height)));
     const x = chart.clientWidth / 2 - scale * (bounds.x + bounds.width / 2);
     const y = padding - scale * bounds.y;
     svg.transition().duration(350).call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));

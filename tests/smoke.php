@@ -20,6 +20,35 @@ if (array_diff($files, $referenced)) $failures[] = 'Orphan uploads found.';
 if (db()->query('PRAGMA integrity_check')->fetchColumn() !== 'ok') $failures[] = 'SQLite integrity check failed.';
 if (!in_array('TCH1', array_column($warehouses, 'code'), true) || !in_array('TCH2', array_column($warehouses, 'code'), true)) $failures[] = 'Default TCH1 and TCH2 warehouses are missing.';
 
+db()->beginTransaction();
+try {
+    try {
+        archive_person(1);
+        $failures[] = 'Archiving a person with active reports should fail.';
+    } catch (InvalidArgumentException $expected) {
+    }
+    try {
+        delete_person(1);
+        $failures[] = 'Deleting a person with direct reports should fail.';
+    } catch (InvalidArgumentException $expected) {
+    }
+    db()->prepare("INSERT INTO personnel(name,title,status) VALUES('Delete Leaf Test','Test','archived')")->execute();
+    $deleteLeafId = (int) db()->lastInsertId();
+    delete_person($deleteLeafId);
+    $stmt = db()->prepare('SELECT COUNT(*) FROM personnel WHERE id = ?');
+    $stmt->execute([$deleteLeafId]);
+    if ((int) $stmt->fetchColumn() !== 0) $failures[] = 'Deleting a leaf person should remove that record.';
+    db()->prepare("INSERT INTO personnel(name,title,status) VALUES('Archived Manager Test','Test','archived')")->execute();
+    $archivedManagerId = (int) db()->lastInsertId();
+    try {
+        validate_person(['name' => 'Active Report Test', 'title' => 'Test', 'manager_id' => $archivedManagerId]);
+        $failures[] = 'Assigning an active person to an archived manager should fail.';
+    } catch (InvalidArgumentException $expected) {
+    }
+} finally {
+    if (db()->inTransaction()) db()->rollBack();
+}
+
 if ($failures) {
     fwrite(STDERR, implode(PHP_EOL, $failures) . PHP_EOL);
     exit(1);

@@ -51,6 +51,10 @@ $config = settings();
             <label class="search"><span>⌕</span><input id="searchInput" type="search" placeholder="Find a person, role or team…" autocomplete="off"></label>
             <select id="departmentFilter" aria-label="Filter by department"><option value="">All departments</option></select>
             <div class="toolbar-group">
+                <div class="view-toggle" role="group" aria-label="Chart view">
+                    <button type="button" class="active" data-view-mode="compact" aria-pressed="true">Compact</button>
+                    <button type="button" data-view-mode="detailed" aria-pressed="false">Detailed</button>
+                </div>
                 <button id="zoomOut" class="icon-button" aria-label="Zoom out">−</button>
                 <button id="fitChart" class="icon-button" aria-label="Fit chart">⌗</button>
                 <button id="zoomIn" class="icon-button" aria-label="Zoom in">+</button>

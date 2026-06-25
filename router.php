@@ -2,6 +2,10 @@
 declare(strict_types=1);
 
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/';
+if ($path === '/favicon.ico') {
+    http_response_code(204);
+    exit;
+}
 if (preg_match('#^/(app|storage|scripts|tests)(/|$)#', $path) || preg_match('/(?:\.sqlite|personnel\.json|\.log)$/', $path)) {
     http_response_code(404);
     exit('Not found');

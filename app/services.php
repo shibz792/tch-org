@@ -34,9 +34,11 @@ function personnel(bool $includeArchived = false): array
 function hierarchy_data(): array
 {
     $people = personnel();
+    $activeIds = array_fill_keys(array_map(fn($person) => (int) $person['id'], $people), true);
     $byManager = [];
     foreach ($people as $person) {
-        $byManager[$person['manager_id'] ?? 'root'][] = $person;
+        $managerId = $person['manager_id'] ? (int) $person['manager_id'] : null;
+        $byManager[$managerId && isset($activeIds[$managerId]) ? $managerId : 'root'][] = $person;
     }
     $build = function ($managerId, array $trail = []) use (&$build, &$byManager): array {
         $nodes = [];
@@ -50,6 +52,31 @@ function hierarchy_data(): array
         return $nodes;
     };
     return $build('root');
+}
+
+function hierarchy_issues(): array
+{
+    $issues = [];
+    $stmt = db()->query("SELECT p.id, p.name, m.name AS manager_name, m.status AS manager_status
+        FROM personnel p
+        JOIN personnel m ON m.id = p.manager_id
+        WHERE p.status = 'active' AND m.status <> 'active'
+        ORDER BY p.name");
+    foreach ($stmt as $row) {
+        $issues[] = sprintf('%s reports to archived manager %s. Move them to an active manager or top level.', $row['name'], $row['manager_name']);
+    }
+
+    $stmt = db()->query("SELECT p.id, p.name, COUNT(c.id) AS active_reports
+        FROM personnel p
+        JOIN personnel c ON c.manager_id = p.id AND c.status = 'active'
+        WHERE p.status = 'archived'
+        GROUP BY p.id, p.name
+        ORDER BY p.name");
+    foreach ($stmt as $row) {
+        $issues[] = sprintf('%s is archived but still has %d active direct report%s.', $row['name'], (int) $row['active_reports'], (int) $row['active_reports'] === 1 ? '' : 's');
+    }
+
+    return $issues;
 }
 
 function public_hierarchy_data(): array
@@ -90,9 +117,9 @@ function validate_person(array $input, ?int $id = null): array
     if ($email && !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Email address is invalid.';
     if ($id && $managerId === $id) $errors[] = 'A person cannot report to themselves.';
     if ($managerId) {
-        $stmt = db()->prepare('SELECT COUNT(*) FROM personnel WHERE id = ?');
+        $stmt = db()->prepare("SELECT COUNT(*) FROM personnel WHERE id = ? AND status = 'active'");
         $stmt->execute([$managerId]);
-        if (!$stmt->fetchColumn()) $errors[] = 'Selected manager does not exist.';
+        if (!$stmt->fetchColumn()) $errors[] = 'Selected manager must be active.';
     }
     if ($departmentId) {
         $stmt = db()->prepare('SELECT COUNT(*) FROM departments WHERE id = ?');
@@ -105,6 +132,14 @@ function validate_person(array $input, ?int $id = null): array
         if (!$stmt->fetchColumn()) $errors[] = 'Selected warehouse does not exist.';
     }
     if ($managerId && $id && creates_cycle($id, $managerId)) $errors[] = 'That reporting line would create a circular hierarchy.';
+    if ($id && $status === 'archived') {
+        $stmt = db()->prepare("SELECT COUNT(*) FROM personnel WHERE manager_id = ? AND status = 'active'");
+        $stmt->execute([$id]);
+        $activeReports = (int) $stmt->fetchColumn();
+        if ($activeReports > 0) {
+            $errors[] = 'Move or archive this person’s active direct reports before archiving them.';
+        }
+    }
     if ($errors) throw new InvalidArgumentException(implode(' ', $errors));
     return [
         'name' => $name, 'title' => $title, 'department_id' => $departmentId, 'warehouse_id' => $warehouseId,
@@ -114,6 +149,41 @@ function validate_person(array $input, ?int $id = null): array
         'display_order' => max(0, (int) ($input['display_order'] ?? 0)),
         'is_cherry_global' => !empty($input['is_cherry_global']) ? 1 : 0,
     ];
+}
+
+function archive_person(int $id): void
+{
+    $stmt = db()->prepare('SELECT * FROM personnel WHERE id = ?');
+    $stmt->execute([$id]);
+    $before = $stmt->fetch();
+    if (!$before) throw new InvalidArgumentException('Person not found.');
+    if ($before['status'] === 'archived') throw new InvalidArgumentException('Person is already archived.');
+
+    $stmt = db()->prepare("SELECT COUNT(*) FROM personnel WHERE manager_id = ? AND status = 'active'");
+    $stmt->execute([$id]);
+    if ((int) $stmt->fetchColumn() > 0) {
+        throw new InvalidArgumentException('Cannot archive this person while they have active direct reports. Move or archive their direct reports first.');
+    }
+
+    db()->prepare("UPDATE personnel SET status='archived', manager_id=NULL, updated_at=CURRENT_TIMESTAMP WHERE id=?")->execute([$id]);
+    audit('archive', 'personnel', $id, $before, ['status' => 'archived', 'manager_id' => null]);
+}
+
+function delete_person(int $id): void
+{
+    $stmt = db()->prepare('SELECT * FROM personnel WHERE id = ?');
+    $stmt->execute([$id]);
+    $before = $stmt->fetch();
+    if (!$before) throw new InvalidArgumentException('Person not found.');
+
+    $stmt = db()->prepare('SELECT COUNT(*) FROM personnel WHERE manager_id = ?');
+    $stmt->execute([$id]);
+    if ((int) $stmt->fetchColumn() > 0) {
+        throw new InvalidArgumentException('Cannot delete this person while they have direct reports. Move or delete those reporting lines first.');
+    }
+
+    db()->prepare('DELETE FROM personnel WHERE id = ?')->execute([$id]);
+    audit('delete', 'personnel', $id, $before, null);
 }
 
 function creates_cycle(int $id, int $managerId): bool
