@@ -2,16 +2,24 @@
 declare(strict_types=1);
 
 const APP_ROOT = __DIR__ . '/..';
-const STORAGE_PATH = APP_ROOT . '/storage';
-const DB_PATH = STORAGE_PATH . '/orgchart.sqlite';
-const UPLOAD_PATH = APP_ROOT . '/uploads';
 const SESSION_TTL = 3600;
+
+$normalizePath = static fn(string $path): string => rtrim($path, DIRECTORY_SEPARATOR) ?: DIRECTORY_SEPARATOR;
+$hasPersistentStorage = (bool) (getenv('ORGCHART_STORAGE_PATH') ?: getenv('RENDER_DISK_PATH'));
+$storagePath = $normalizePath((string) (getenv('ORGCHART_STORAGE_PATH') ?: getenv('RENDER_DISK_PATH') ?: APP_ROOT . '/storage'));
+$dbPath = $normalizePath((string) (getenv('ORGCHART_DB_PATH') ?: $storagePath . '/orgchart.sqlite'));
+$uploadPath = getenv('ORGCHART_UPLOAD_PATH')
+    ?: ($hasPersistentStorage ? $storagePath . '/uploads' : APP_ROOT . '/uploads');
+
+define('STORAGE_PATH', $storagePath);
+define('DB_PATH', $dbPath);
+define('UPLOAD_PATH', $normalizePath((string) $uploadPath));
 
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 date_default_timezone_set(getenv('APP_TIMEZONE') ?: 'Pacific/Auckland');
 
-foreach ([STORAGE_PATH, STORAGE_PATH . '/backups', STORAGE_PATH . '/logs', UPLOAD_PATH] as $directory) {
+foreach ([STORAGE_PATH, dirname(DB_PATH), STORAGE_PATH . '/backups', STORAGE_PATH . '/logs', STORAGE_PATH . '/migration', UPLOAD_PATH] as $directory) {
     if (!is_dir($directory)) {
         mkdir($directory, 0750, true);
     }
@@ -47,4 +55,3 @@ header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https:
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/services.php';
-

@@ -12,13 +12,21 @@ foreach ($people as $person) {
     if ($person['manager_id'] !== null && !in_array((int) $person['manager_id'], $ids, true)) $failures[] = "Missing manager for {$person['name']}.";
     if ($person['manager_id'] && creates_cycle((int) $person['id'], (int) $person['manager_id'])) $failures[] = "Cycle found for {$person['name']}.";
     if ($person['warehouse_id'] !== null && !in_array((int) $person['warehouse_id'], array_map(fn($w) => (int) $w['id'], $warehouses), true)) $failures[] = "Missing warehouse for {$person['name']}.";
-    if (str_starts_with($person['photo_path'], 'uploads/') && !is_file(APP_ROOT . '/' . $person['photo_path'])) $failures[] = "Missing photo for {$person['name']}.";
+    if (str_starts_with($person['photo_path'], 'uploads/') && !upload_file_exists($person['photo_path'])) $failures[] = "Missing photo for {$person['name']}.";
 }
 $referenced = array_filter(array_column($people, 'photo_path'), fn($p) => str_starts_with($p, 'uploads/'));
-$files = array_map(fn($p) => 'uploads/' . basename($p), glob(UPLOAD_PATH . '/*.{jpg,jpeg,png,webp}', GLOB_BRACE) ?: []);
+$uploadDirectories = array_values(array_unique([UPLOAD_PATH, APP_ROOT . '/uploads']));
+$files = [];
+foreach ($uploadDirectories as $directory) {
+    foreach (glob($directory . '/*.{jpg,jpeg,png,webp}', GLOB_BRACE) ?: [] as $p) {
+        $files[] = 'uploads/' . basename($p);
+    }
+}
+$files = array_values(array_unique($files));
 if (array_diff($files, $referenced)) $failures[] = 'Orphan uploads found.';
 if (db()->query('PRAGMA integrity_check')->fetchColumn() !== 'ok') $failures[] = 'SQLite integrity check failed.';
 if (!in_array('TCH1', array_column($warehouses, 'code'), true) || !in_array('TCH2', array_column($warehouses, 'code'), true)) $failures[] = 'Default TCH1 and TCH2 warehouses are missing.';
+if (strpos(DB_PATH, APP_ROOT) === 0 && getenv('RENDER')) $failures[] = 'Render runtime is using project-local database storage. Set ORGCHART_STORAGE_PATH or RENDER_DISK_PATH to a persistent disk.';
 
 db()->beginTransaction();
 try {

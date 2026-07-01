@@ -6,6 +6,29 @@ function e(mixed $value): string
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function upload_paths(string $path): array
+{
+    if (!str_starts_with($path, 'uploads/')) {
+        return [];
+    }
+
+    $name = basename($path);
+    return array_values(array_unique([
+        UPLOAD_PATH . '/' . $name,
+        APP_ROOT . '/uploads/' . $name,
+    ]));
+}
+
+function upload_file_exists(string $path): bool
+{
+    foreach (upload_paths($path) as $candidate) {
+        if (is_file($candidate)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function csrf_token(): string
 {
     if (empty($_SESSION['csrf_token'])) {
@@ -112,4 +135,3 @@ function safe_upload(array $file): string
     }
     return 'uploads/' . $name;
 }
-
