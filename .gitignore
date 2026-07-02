@@ -1,0 +1,16 @@
+/storage/*.sqlite*
+/storage/backups/*
+/storage/logs/*
+/storage/migration/*
+!/storage/backups/.gitkeep
+!/storage/logs/.gitkeep
+!/storage/migration/.gitkeep
+.DS_Store
+/storage/.DS_Store
+/uploads/img_*
+/uploads/*.jpg
+/uploads/*.jpeg
+/uploads/*.png
+/uploads/*.webp
+!/uploads/.htaccess
+!/uploads/.gitkeep

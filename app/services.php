@@ -219,7 +219,7 @@ function save_person(array $input, ?int $id = null, ?array $file = null): int
         } else {
             $sql = 'INSERT INTO personnel(name,title,department_id,warehouse_id,location,email,phone,bio,status,manager_id,display_order,is_cherry_global,photo_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)';
             db()->prepare($sql)->execute([...array_values($data), $photo]);
-            $id = (int) db()->lastInsertId();
+            $id = db_last_insert_id('personnel');
             audit('create', 'personnel', $id, null, [...$data, 'photo_path' => $photo]);
         }
         if ($ownsTransaction) db()->commit();
@@ -232,6 +232,25 @@ function save_person(array $input, ?int $id = null, ?array $file = null): int
 
 function create_backup(): string
 {
+    if (db_is_pgsql()) {
+        $file = STORAGE_PATH . '/backups/orgchart-' . date('Ymd-His') . '.json';
+        $tables = ['departments', 'warehouses', 'personnel', 'users', 'audit_logs', 'settings'];
+        $data = [];
+        foreach ($tables as $table) {
+            $data[$table] = db()->query("SELECT * FROM $table ORDER BY 1")->fetchAll();
+        }
+        file_put_contents($file, json_encode([
+            'driver' => 'pgsql',
+            'created_at' => date(DATE_ATOM),
+            'tables' => $data,
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $files = glob(STORAGE_PATH . '/backups/orgchart-*.*') ?: [];
+        usort($files, fn($a, $b) => filemtime($b) <=> filemtime($a));
+        foreach (array_slice($files, 10) as $old) unlink($old);
+        audit('backup', 'database', null, null, ['file' => basename($file), 'driver' => 'pgsql']);
+        return $file;
+    }
+
     $file = STORAGE_PATH . '/backups/orgchart-' . date('Ymd-His') . '.sqlite';
     $quoted = str_replace("'", "''", $file);
     db()->exec("VACUUM INTO '$quoted'");

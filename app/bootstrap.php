@@ -8,11 +8,14 @@ $normalizePath = static fn(string $path): string => rtrim($path, DIRECTORY_SEPAR
 $hasPersistentStorage = (bool) (getenv('ORGCHART_STORAGE_PATH') ?: getenv('RENDER_DISK_PATH'));
 $storagePath = $normalizePath((string) (getenv('ORGCHART_STORAGE_PATH') ?: getenv('RENDER_DISK_PATH') ?: APP_ROOT . '/storage'));
 $dbPath = $normalizePath((string) (getenv('ORGCHART_DB_PATH') ?: $storagePath . '/orgchart.sqlite'));
+$databaseUrl = (string) (getenv('ORGCHART_DATABASE_URL') ?: getenv('DATABASE_URL') ?: '');
 $uploadPath = getenv('ORGCHART_UPLOAD_PATH')
     ?: ($hasPersistentStorage ? $storagePath . '/uploads' : APP_ROOT . '/uploads');
 
 define('STORAGE_PATH', $storagePath);
 define('DB_PATH', $dbPath);
+define('DATABASE_URL', $databaseUrl);
+define('DB_DRIVER', $databaseUrl !== '' ? 'pgsql' : 'sqlite');
 define('UPLOAD_PATH', $normalizePath((string) $uploadPath));
 
 ini_set('display_errors', '0');
@@ -50,7 +53,7 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
-header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https://i.ibb.co; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https://i.ibb.co https://res.cloudinary.com https://*.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
 
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/security.php';

@@ -8,6 +8,9 @@ function e(mixed $value): string
 
 function upload_paths(string $path): array
 {
+    if (filter_var($path, FILTER_VALIDATE_URL)) {
+        return [];
+    }
     if (!str_starts_with($path, 'uploads/')) {
         return [];
     }
@@ -21,6 +24,9 @@ function upload_paths(string $path): array
 
 function upload_file_exists(string $path): bool
 {
+    if (filter_var($path, FILTER_VALIDATE_URL)) {
+        return true;
+    }
     foreach (upload_paths($path) as $candidate) {
         if (is_file($candidate)) {
             return true;
@@ -69,15 +75,22 @@ function require_admin(): array
 function login_user(string $email, string $password): bool
 {
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    db()->prepare("DELETE FROM login_attempts WHERE attempted_at < datetime('now', '-20 minutes')")->execute();
-    $check = db()->prepare("SELECT COUNT(*) FROM login_attempts WHERE (identifier = ? OR ip_address = ?) AND attempted_at > datetime('now', '-15 minutes')");
+    if (db_is_pgsql()) {
+        db()->prepare("DELETE FROM login_attempts WHERE attempted_at < CURRENT_TIMESTAMP - INTERVAL '20 minutes'")->execute();
+        $check = db()->prepare("SELECT COUNT(*) FROM login_attempts WHERE (identifier = ? OR ip_address = ?) AND attempted_at > CURRENT_TIMESTAMP - INTERVAL '15 minutes'");
+    } else {
+        db()->prepare("DELETE FROM login_attempts WHERE attempted_at < datetime('now', '-20 minutes')")->execute();
+        $check = db()->prepare("SELECT COUNT(*) FROM login_attempts WHERE (identifier = ? OR ip_address = ?) AND attempted_at > datetime('now', '-15 minutes')");
+    }
     $check->execute([mb_strtolower($email), $ip]);
     if ((int) $check->fetchColumn() >= 8) {
         return false;
     }
 
-    $stmt = db()->prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE AND status = 'active'");
-    $stmt->execute([$email]);
+    $stmt = db()->prepare(db_is_pgsql()
+        ? "SELECT * FROM users WHERE lower(email) = lower(?) AND status = 'active'"
+        : "SELECT * FROM users WHERE email = ? COLLATE NOCASE AND status = 'active'");
+    $stmt->execute([trim($email)]);
     $user = $stmt->fetch();
     if (!$user || !password_verify($password, $user['password_hash'])) {
         db()->prepare('INSERT INTO login_attempts(identifier, ip_address) VALUES(?, ?)')->execute([mb_strtolower($email), $ip]);
@@ -129,9 +142,67 @@ function safe_upload(array $file): string
     if (!isset($extensions[$mime]) || !getimagesize($file['tmp_name'])) {
         throw new InvalidArgumentException('Only valid JPG, PNG, and WebP images are accepted.');
     }
+    if (cloudinary_is_configured()) {
+        return cloudinary_upload($file['tmp_name']);
+    }
     $name = bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
     if (!move_uploaded_file($file['tmp_name'], UPLOAD_PATH . '/' . $name)) {
         throw new RuntimeException('Unable to store the photo.');
     }
     return 'uploads/' . $name;
+}
+
+function cloudinary_is_configured(): bool
+{
+    return (bool) (getenv('CLOUDINARY_CLOUD_NAME') && getenv('CLOUDINARY_API_KEY') && getenv('CLOUDINARY_API_SECRET'));
+}
+
+function cloudinary_upload(string $tmpPath): string
+{
+    $cloudName = (string) getenv('CLOUDINARY_CLOUD_NAME');
+    $apiKey = (string) getenv('CLOUDINARY_API_KEY');
+    $apiSecret = (string) getenv('CLOUDINARY_API_SECRET');
+    $folder = trim((string) (getenv('CLOUDINARY_FOLDER') ?: 'orgchart/personnel'), '/');
+    $timestamp = time();
+    $publicId = 'person_' . bin2hex(random_bytes(10));
+    $signatureParams = [
+        'folder' => $folder,
+        'public_id' => $publicId,
+        'timestamp' => $timestamp,
+    ];
+    ksort($signatureParams);
+    $signatureBase = implode('&', array_map(
+        fn($key, $value) => $key . '=' . $value,
+        array_keys($signatureParams),
+        array_values($signatureParams)
+    ));
+    $signature = sha1($signatureBase . $apiSecret);
+
+    $curl = curl_init("https://api.cloudinary.com/v1_1/$cloudName/image/upload");
+    curl_setopt_array($curl, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_POSTFIELDS => [
+            'file' => new CURLFile($tmpPath),
+            'api_key' => $apiKey,
+            'timestamp' => (string) $timestamp,
+            'folder' => $folder,
+            'public_id' => $publicId,
+            'signature' => $signature,
+        ],
+    ]);
+    $response = curl_exec($curl);
+    $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+    $error = curl_error($curl);
+    curl_close($curl);
+
+    if ($response === false || $status >= 400) {
+        throw new RuntimeException('Unable to upload the photo to Cloudinary.' . ($error ? " $error" : ''));
+    }
+    $payload = json_decode((string) $response, true);
+    if (!is_array($payload) || empty($payload['secure_url'])) {
+        throw new RuntimeException('Cloudinary did not return a usable photo URL.');
+    }
+    return (string) $payload['secure_url'];
 }

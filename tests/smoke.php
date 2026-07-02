@@ -24,9 +24,13 @@ foreach ($uploadDirectories as $directory) {
 }
 $files = array_values(array_unique($files));
 if (array_diff($files, $referenced)) $failures[] = 'Orphan uploads found.';
-if (db()->query('PRAGMA integrity_check')->fetchColumn() !== 'ok') $failures[] = 'SQLite integrity check failed.';
+if (db_is_pgsql()) {
+    if (!db()->query('SELECT 1')->fetchColumn()) $failures[] = 'PostgreSQL connection check failed.';
+} elseif (db()->query('PRAGMA integrity_check')->fetchColumn() !== 'ok') {
+    $failures[] = 'SQLite integrity check failed.';
+}
 if (!in_array('TCH1', array_column($warehouses, 'code'), true) || !in_array('TCH2', array_column($warehouses, 'code'), true)) $failures[] = 'Default TCH1 and TCH2 warehouses are missing.';
-if (strpos(DB_PATH, APP_ROOT) === 0 && getenv('RENDER')) $failures[] = 'Render runtime is using project-local database storage. Set ORGCHART_STORAGE_PATH or RENDER_DISK_PATH to a persistent disk.';
+if (!db_is_pgsql() && strpos(DB_PATH, APP_ROOT) === 0 && getenv('RENDER')) $failures[] = 'Render runtime is using project-local database storage. Set DATABASE_URL for Postgres or ORGCHART_STORAGE_PATH for a persistent disk.';
 
 db()->beginTransaction();
 try {
@@ -41,13 +45,13 @@ try {
     } catch (InvalidArgumentException $expected) {
     }
     db()->prepare("INSERT INTO personnel(name,title,status) VALUES('Delete Leaf Test','Test','archived')")->execute();
-    $deleteLeafId = (int) db()->lastInsertId();
+    $deleteLeafId = db_last_insert_id('personnel');
     delete_person($deleteLeafId);
     $stmt = db()->prepare('SELECT COUNT(*) FROM personnel WHERE id = ?');
     $stmt->execute([$deleteLeafId]);
     if ((int) $stmt->fetchColumn() !== 0) $failures[] = 'Deleting a leaf person should remove that record.';
     db()->prepare("INSERT INTO personnel(name,title,status) VALUES('Archived Manager Test','Test','archived')")->execute();
-    $archivedManagerId = (int) db()->lastInsertId();
+    $archivedManagerId = db_last_insert_id('personnel');
     try {
         validate_person(['name' => 'Active Report Test', 'title' => 'Test', 'manager_id' => $archivedManagerId]);
         $failures[] = 'Assigning an active person to an archived manager should fail.';
@@ -61,4 +65,4 @@ if ($failures) {
     fwrite(STDERR, implode(PHP_EOL, $failures) . PHP_EOL);
     exit(1);
 }
-echo "Smoke checks passed: 25 people, valid hierarchy, warehouses, uploads, and SQLite database.\n";
+echo "Smoke checks passed: 25 people, valid hierarchy, warehouses, uploads, and " . (db_is_pgsql() ? 'PostgreSQL' : 'SQLite') . " database.\n";

@@ -13,7 +13,7 @@ if (is_file($legacy) && (int) db()->query('SELECT COUNT(*) FROM personnel')->fet
         'Warehouse' => '#8a6d3b', 'Finance' => '#725a8a', 'Technology' => '#3f6f91',
         'Marketing' => '#a45d67', 'Customer Experience' => '#667d55',
     ];
-    $departmentStmt = db()->prepare('INSERT OR IGNORE INTO departments(name,color,display_order) VALUES(?,?,?)');
+    $departmentStmt = db()->prepare(db_insert_ignore_sql('departments', ['name', 'color', 'display_order'], 'name'));
     foreach ($departmentSeeds as $order => $color) $departmentStmt->execute([$order, $color, array_search($order, array_keys($departmentSeeds), true)]);
     $departmentIds = db()->query('SELECT name,id FROM departments')->fetchAll(PDO::FETCH_KEY_PAIR);
     $stmt = db()->prepare('INSERT INTO personnel(id,name,title,department_id,manager_id,legacy_level,photo_path,is_cherry_global,display_order) VALUES(?,?,?,?,NULL,?,?,?,?)');
@@ -38,6 +38,7 @@ if (is_file($legacy) && (int) db()->query('SELECT COUNT(*) FROM personnel')->fet
     foreach ($records as $record) {
         $manager->execute([$record['reports_to'] ?? null, $record['id']]);
     }
+    db_reset_identity('personnel');
     db()->commit();
     echo 'Migrated ' . count($records) . " personnel records.\n";
 }
@@ -54,4 +55,4 @@ if ($email && $password && (int) db()->query('SELECT COUNT(*) FROM users')->fetc
     echo "Created initial administrator: $email\n";
 }
 
-echo "Database ready at " . DB_PATH . "\n";
+echo db_is_pgsql() ? "PostgreSQL database ready.\n" : "Database ready at " . DB_PATH . "\n";

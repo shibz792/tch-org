@@ -1,0 +1,7 @@
+Options -Indexes
+RewriteEngine On
+RewriteRule ^(?:app|storage|scripts|tests)/ - [F,L]
+<FilesMatch "(^\.|personnel\.json$|\.sqlite$|\.log$)">
+    Require all denied
+</FilesMatch>
+
