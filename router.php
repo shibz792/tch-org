@@ -27,6 +27,17 @@ if (preg_match('#^/uploads/([^/]+)$#', $path, $match)) {
             exit;
         }
     }
+    require_once __DIR__ . '/app/bootstrap.php';
+    github_restore_upload_if_configured('uploads/' . $name);
+    foreach (upload_paths('uploads/' . $name) as $candidate) {
+        if (is_file($candidate)) {
+            $mime = (new finfo(FILEINFO_MIME_TYPE))->file($candidate) ?: 'application/octet-stream';
+            header('Content-Type: ' . $mime);
+            header('Content-Length: ' . filesize($candidate));
+            readfile($candidate);
+            exit;
+        }
+    }
     http_response_code(404);
     exit('Not found');
 }

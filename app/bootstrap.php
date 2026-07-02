@@ -17,6 +17,11 @@ define('DB_PATH', $dbPath);
 define('DATABASE_URL', $databaseUrl);
 define('DB_DRIVER', $databaseUrl !== '' ? 'pgsql' : 'sqlite');
 define('UPLOAD_PATH', $normalizePath((string) $uploadPath));
+define('GITHUB_PERSISTENCE_TOKEN', (string) getenv('ORGCHART_GITHUB_TOKEN'));
+define('GITHUB_PERSISTENCE_REPO', (string) (getenv('ORGCHART_GITHUB_REPO') ?: 'shibz792/tch-org'));
+define('GITHUB_PERSISTENCE_BRANCH', (string) (getenv('ORGCHART_GITHUB_BRANCH') ?: 'data'));
+define('GITHUB_PERSISTENCE_BASE_BRANCH', (string) (getenv('ORGCHART_GITHUB_BASE_BRANCH') ?: 'main'));
+define('GITHUB_PERSISTENCE_DB_PATH', (string) (getenv('ORGCHART_GITHUB_DB_PATH') ?: 'storage/orgchart.sqlite'));
 
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -27,6 +32,9 @@ foreach ([STORAGE_PATH, dirname(DB_PATH), STORAGE_PATH . '/backups', STORAGE_PAT
         mkdir($directory, 0750, true);
     }
 }
+
+require_once __DIR__ . '/github_persistence.php';
+github_restore_database_if_configured();
 
 $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
 session_name('orgchart_session');

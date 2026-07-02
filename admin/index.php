@@ -111,6 +111,9 @@ try {
         } elseif ($action === 'backup') {
             $file=create_backup();header('Content-Type: application/octet-stream');header('Content-Disposition: attachment; filename="'.basename($file).'"');readfile($file);exit;
         }
+        if (in_array($action, ['save_person','archive_person','delete_person','move_person','save_department','save_warehouse','save_user','toggle_user','change_password','settings','import_confirm'], true)) {
+            github_persist_database_if_configured((string) $action);
+        }
     }
 } catch (Throwable $e) { if(db()->inTransaction())db()->rollBack(); $error=$e->getMessage(); }
 

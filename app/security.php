@@ -149,6 +149,7 @@ function safe_upload(array $file): string
     if (!move_uploaded_file($file['tmp_name'], UPLOAD_PATH . '/' . $name)) {
         throw new RuntimeException('Unable to store the photo.');
     }
+    github_persist_upload_if_configured('uploads/' . $name, UPLOAD_PATH . '/' . $name);
     return 'uploads/' . $name;
 }
 

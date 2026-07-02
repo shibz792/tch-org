@@ -20,9 +20,37 @@ php tests/smoke.php
 
 Admin edits are stored in SQLite and uploaded images. On Render, those files must live on a persistent disk. If they stay inside the deployed project directory, a deploy, restart, or rebuild can make the app appear to revert.
 
-On Render Free, persistent disks are not available. Use an external Postgres database and remote image storage instead.
+On Render Free, persistent disks are not available. If you want to use only Render and GitHub, enable GitHub persistence. The app will keep using SQLite, but it will save the database and uploaded images back to a GitHub data branch after admin changes.
 
-## Render Free Setup
+## Render Free + GitHub Setup
+
+Create a GitHub token:
+
+1. Go to GitHub `Settings` -> `Developer settings` -> `Personal access tokens`.
+2. Create a fine-grained token for this repository.
+3. Give it `Contents: Read and write`.
+4. Copy the token.
+
+Add these environment variables to the Render service:
+
+```bash
+ORGCHART_GITHUB_TOKEN=github_pat_or_classic_token
+ORGCHART_GITHUB_REPO=shibz792/tch-org
+ORGCHART_GITHUB_BRANCH=data
+ORGCHART_GITHUB_BASE_BRANCH=main
+ORGCHART_GITHUB_DB_PATH=storage/orgchart.sqlite
+```
+
+Seed the GitHub data branch once from your local project:
+
+```bash
+ORGCHART_GITHUB_TOKEN='github_pat_or_classic_token' \
+php scripts/persist-to-github.php
+```
+
+After that, trigger a Render deploy. Admin edits and uploaded photos will be committed to the `data` branch, while app code stays on `main`. This avoids a deploy loop after every admin edit.
+
+## External Database Alternative
 
 Recommended free-friendly setup:
 
