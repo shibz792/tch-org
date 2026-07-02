@@ -34,7 +34,6 @@ function github_api(string $method, string $path, ?array $payload = null): array
     $body = curl_exec($curl);
     $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
     $error = curl_error($curl);
-    curl_close($curl);
 
     $data = $body ? json_decode((string) $body, true) : null;
     if ($status >= 400) {
