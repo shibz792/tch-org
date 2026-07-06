@@ -13,6 +13,11 @@ function github_marker_path(): string
     return STORAGE_PATH . '/.github-db-sha';
 }
 
+function github_uploads_marker_path(): string
+{
+    return STORAGE_PATH . '/.github-uploads-sha';
+}
+
 function github_api(string $method, string $path, ?array $payload = null): array
 {
     $curl = curl_init('https://api.github.com' . $path);
@@ -191,5 +196,31 @@ function github_restore_upload_if_configured(string $relativePath): bool
     } catch (Throwable $e) {
         error_log($e->getMessage());
         return false;
+    }
+}
+
+function github_restore_referenced_uploads_if_configured(): void
+{
+    if (!github_persistence_enabled() || !function_exists('db') || db_is_pgsql() || !is_file(DB_PATH)) {
+        return;
+    }
+
+    $dbMarker = is_file(github_marker_path()) ? trim((string) file_get_contents(github_marker_path())) : '';
+    if ($dbMarker !== '' && is_file(github_uploads_marker_path()) && trim((string) file_get_contents(github_uploads_marker_path())) === $dbMarker) {
+        return;
+    }
+
+    try {
+        $stmt = db()->query("SELECT DISTINCT photo_path FROM personnel WHERE photo_path LIKE 'uploads/%'");
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $path) {
+            if (is_string($path) && $path !== '') {
+                github_restore_upload_if_configured($path);
+            }
+        }
+        if ($dbMarker !== '') {
+            file_put_contents(github_uploads_marker_path(), $dbMarker, LOCK_EX);
+        }
+    } catch (Throwable $e) {
+        error_log($e->getMessage());
     }
 }

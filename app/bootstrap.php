@@ -66,3 +66,4 @@ header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https:
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/services.php';
+github_restore_referenced_uploads_if_configured();

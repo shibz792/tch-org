@@ -1,5 +1,6 @@
 /storage/*.sqlite*
 /storage/.github-db-sha
+/storage/.github-uploads-sha
 /storage/backups/*
 /storage/logs/*
 /storage/migration/*
