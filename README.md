@@ -50,6 +50,8 @@ php scripts/persist-to-github.php
 
 After that, trigger a Render deploy. Admin edits and uploaded photos will be committed to the `data` branch, while app code stays on `main`. This avoids a deploy loop after every admin edit.
 
+Uploaded images on Render are restored lazily from GitHub when `/uploads/<filename>` is requested. Apache must route missing files through `router.php`; the root `.htaccess` handles this.
+
 ## External Database Alternative
 
 Recommended free-friendly setup:

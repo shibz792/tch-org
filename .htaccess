@@ -1,7 +1,9 @@
 Options -Indexes
 RewriteEngine On
 RewriteRule ^(?:app|storage|scripts|tests)/ - [F,L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ router.php [L]
 <FilesMatch "(^\.|personnel\.json$|\.sqlite$|\.log$)">
     Require all denied
 </FilesMatch>
-
